@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>후원 알림</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:transparent; font-family:'Segoe UI','Malgun Gothic',sans-serif; overflow:hidden; }
+
+/* ── 공통 ── */
+.alert { display:flex; align-items:center; gap:14px; color:#fff; }
+.alert.out { pointer-events:none; }
+.alert-icon { font-size:32px; flex-shrink:0; }
+.alert-body { flex:1; min-width:0; }
+.alert-nick  { font-weight:800; font-size:16px; }
+.alert-amt   { font-size:22px; font-weight:900; margin-top:1px; }
+.alert-amt b { color:#FFD700; }
+.alert-msg   { font-size:13px; margin-top:4px; word-break:break-all; opacity:0.8; }
+
+/* ── 공통 키프레임 ── */
+@keyframes su  { from{opacity:0;transform:translateY(20px) scale(.95)} to{opacity:1;transform:none} }
+@keyframes fu  { from{opacity:1;transform:none} to{opacity:0;transform:translateY(-12px) scale(.95)} }
+@keyframes suf { from{opacity:0;transform:translateY(100%)} to{opacity:1;transform:none} }
+@keyframes sdf { from{opacity:1;transform:none} to{opacity:0;transform:translateY(100%)} }
+@keyframes si  { from{opacity:0;transform:scale(.8)} to{opacity:1;transform:none} }
+@keyframes so  { from{opacity:1;transform:none} to{opacity:0;transform:scale(1.08)} }
+@keyframes slr { from{opacity:0;transform:translateX(30px)} to{opacity:1;transform:none} }
+@keyframes flr { from{opacity:1;transform:none} to{opacity:0;transform:translateX(30px)} }
+@keyframes srl { from{opacity:0;transform:translateX(-30px)} to{opacity:1;transform:none} }
+@keyframes frl { from{opacity:1;transform:none} to{opacity:0;transform:translateX(-30px)} }
+@keyframes sd  { from{opacity:0;transform:translateY(-100%)} to{opacity:1;transform:none} }
+@keyframes fsd { from{opacity:1;transform:none} to{opacity:0;transform:translateY(-100%)} }
+
+/* ── 1: 카드형 (하단 좌측) ── */
+[data-theme="1"] #a { position:fixed;bottom:20px;left:20px;width:420px; }
+[data-theme="1"] .alert { background:linear-gradient(135deg,#1a1c23ee,#252830ee);border:1px solid #00FFA3;border-radius:14px;padding:16px 20px;margin-bottom:10px;box-shadow:0 0 24px #00FFA340,0 4px 24px #00000080;animation:su .4s cubic-bezier(.175,.885,.32,1.275) forwards; }
+[data-theme="1"] .alert.out { animation:fu .35s ease forwards; }
+[data-theme="1"] .alert-nick { color:#00FFA3; }
+
+/* ── 2: 배너형 (하단 전체) ── */
+[data-theme="2"] #a { position:fixed;bottom:0;left:0;right:0; }
+[data-theme="2"] .alert { background:linear-gradient(90deg,#0d0f14f0 0%,#1a1c23f0 40%,#0d0f14f0 100%);border-top:2px solid #00FFA3;padding:18px 40px;margin:0;gap:20px;animation:suf .5s ease forwards; }
+[data-theme="2"] .alert.out { animation:sdf .4s ease forwards; }
+[data-theme="2"] .alert-icon { font-size:40px; }
+[data-theme="2"] .alert-nick { color:#00FFA3;font-size:18px; }
+[data-theme="2"] .alert-amt  { font-size:28px; }
+[data-theme="2"] .alert-msg  { font-size:15px; }
+
+/* ── 3: 네온형 (하단 중앙 글로우) ── */
+[data-theme="3"] #a { position:fixed;bottom:30px;left:50%;transform:translateX(-50%);width:520px; }
+[data-theme="3"] .alert { background:#0a0b0fee;border:1px solid #00FFA3;border-radius:16px;padding:20px 24px;margin-bottom:10px;box-shadow:0 0 20px #00FFA360,0 0 60px #00FFA330,inset 0 1px 0 #00FFA315;animation:si .5s cubic-bezier(.175,.885,.32,1.275) forwards; }
+[data-theme="3"] .alert.out { animation:so .4s ease forwards; }
+[data-theme="3"] .alert-nick { color:#00FFA3;text-shadow:0 0 10px #00FFA380;font-size:17px; }
+[data-theme="3"] .alert-amt  { font-size:26px;text-shadow:0 0 8px #FFD70060; }
+[data-theme="3"] .alert-amt b{ text-shadow:0 0 15px #FFD700; }
+[data-theme="3"] .alert-msg  { color:#aaa; }
+
+/* ── 4: 토스트형 (상단 우측) ── */
+[data-theme="4"] #a { position:fixed;top:20px;right:20px;width:380px; }
+[data-theme="4"] .alert { background:#1a1c23f5;border-left:3px solid #00FFA3;border-radius:10px;padding:14px 18px;margin-bottom:8px;box-shadow:0 4px 24px #00000060,0 0 0 1px #ffffff08;animation:slr .4s cubic-bezier(.175,.885,.32,1.275) forwards; }
+[data-theme="4"] .alert.out { animation:flr .3s ease forwards; }
+[data-theme="4"] .alert-nick { color:#00FFA3;font-size:15px; }
+[data-theme="4"] .alert-amt  { font-size:20px; }
+[data-theme="4"] .alert-msg  { font-size:12px; }
+
+/* ── 5: 리본형 (상단 전체) ── */
+[data-theme="5"] #a { position:fixed;top:0;left:0;right:0; }
+[data-theme="5"] .alert { background:linear-gradient(90deg,#0d0f14f0,#1a1c23f0 30%,#252830f0 70%,#0d0f14f0);border-bottom:2px solid #00FFA3;padding:14px 60px;margin:0;justify-content:center;gap:16px;animation:sd .5s ease forwards; }
+[data-theme="5"] .alert.out { animation:fsd .4s ease forwards; }
+[data-theme="5"] .alert-nick { color:#00FFA3;font-size:17px; }
+[data-theme="5"] .alert-amt  { font-size:26px; }
+[data-theme="5"] .alert-msg  { font-size:14px; }
+
+/* ── 6: 팝업형 (화면 중앙) ── */
+[data-theme="6"] #a { position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none; }
+[data-theme="6"] .alert { background:linear-gradient(145deg,#1e2028,#252830);border:1px solid #00FFA3;border-radius:20px;padding:28px 36px;flex-direction:column;text-align:center;gap:8px;max-width:480px;width:90%;box-shadow:0 0 60px #00000080,0 0 30px #00FFA320;animation:si .5s cubic-bezier(.175,.885,.32,1.275) forwards; }
+[data-theme="6"] .alert.out { animation:so .4s ease forwards; }
+[data-theme="6"] .alert-icon { font-size:48px;margin-bottom:4px; }
+[data-theme="6"] .alert-nick { color:#00FFA3;font-size:18px; }
+[data-theme="6"] .alert-amt  { font-size:32px; }
+[data-theme="6"] .alert-msg  { color:#bbb;font-size:15px; }
+
+/* ── 7: 미니멀형 (하단 좌측, 배경 없음) ── */
+[data-theme="7"] #a { position:fixed;bottom:20px;left:20px;width:460px; }
+[data-theme="7"] .alert { border-left:3px solid #00FFA3;padding:8px 14px;margin-bottom:8px;animation:su .35s ease forwards; }
+[data-theme="7"] .alert.out { animation:fu .3s ease forwards; }
+[data-theme="7"] .alert-nick { color:#00FFA3;text-shadow:1px 1px 4px #000;font-size:15px; }
+[data-theme="7"] .alert-amt  { font-size:20px;text-shadow:1px 1px 4px #000; }
+[data-theme="7"] .alert-msg  { text-shadow:1px 1px 3px #000; }
+
+/* ── 8: 사이드형 (좌측 세로 패널) ── */
+[data-theme="8"] #a { position:fixed;top:0;left:0;bottom:0;width:300px;display:flex;flex-direction:column;justify-content:center;padding:20px; }
+[data-theme="8"] .alert { background:linear-gradient(180deg,#1a1c23ee,#0f1115ee);border:1px solid #00FFA380;border-radius:14px;padding:20px 18px;margin-bottom:12px;flex-direction:column;align-items:flex-start;gap:8px;box-shadow:4px 0 30px #00000060;animation:srl .4s cubic-bezier(.175,.885,.32,1.275) forwards; }
+[data-theme="8"] .alert.out { animation:frl .35s ease forwards; }
+[data-theme="8"] .alert-icon { font-size:36px; }
+[data-theme="8"] .alert-nick { color:#00FFA3;font-size:16px; }
+[data-theme="8"] .alert-amt  { font-size:24px; }
+
+/* ── 9: 우하단형 (하단 우측) ── */
+[data-theme="9"] #a { position:fixed;bottom:20px;right:20px;width:340px; }
+[data-theme="9"] .alert { background:#17191df0;border:1px solid #00FFA360;border-radius:12px;padding:12px 16px;margin-bottom:8px;box-shadow:0 4px 20px #00000070;animation:slr .4s cubic-bezier(.175,.885,.32,1.275) forwards; }
+[data-theme="9"] .alert.out { animation:flr .3s ease forwards; }
+[data-theme="9"] .alert-nick { color:#00FFA3;font-size:14px; }
+[data-theme="9"] .alert-amt  { font-size:18px; }
+[data-theme="9"] .alert-msg  { font-size:11px; }
+[data-theme="9"] .alert-icon { font-size:24px; }
+
+/* ── 10: 스포트라이트형 (화면 중앙 강조) ── */
+[data-theme="10"] #a { position:fixed;inset:0;background:#00000070;display:flex;align-items:center;justify-content:center;pointer-events:none; }
+[data-theme="10"] .alert { background:radial-gradient(ellipse at center,#252830ff 60%,#1a1c23ff);border:2px solid #00FFA3;border-radius:24px;padding:32px 44px;flex-direction:column;text-align:center;gap:10px;max-width:500px;box-shadow:0 0 0 40px #00000060,0 0 80px #00FFA320;animation:si .6s cubic-bezier(.175,.885,.32,1.275) forwards; }
+[data-theme="10"] .alert.out { animation:so .5s ease forwards; }
+[data-theme="10"] .alert-icon { font-size:56px; }
+[data-theme="10"] .alert-nick { color:#00FFA3;font-size:20px;text-shadow:0 0 20px #00FFA360; }
+[data-theme="10"] .alert-amt  { font-size:36px; }
+[data-theme="10"] .alert-msg  { color:#ccc;font-size:16px;max-width:320px; }
+</style>
+</head>
+<body>
+<div id="a"></div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const theme = parseInt(new URLSearchParams(location.search).get('theme') || '1')
+document.body.dataset.theme = theme
+const socket = io()
+const box = document.getElementById('a')
+socket.on('donation', show)
+function show(d) {
+  const el = document.createElement('div')
+  el.className = 'alert'
+  el.innerHTML = `<div class="alert-icon">🧀</div><div class="alert-body"><div class="alert-nick">${esc(d.nickname)}</div><div class="alert-amt"><b>${(d.amount||0).toLocaleString()}</b> 치즈 후원!</div>${d.message?`<div class="alert-msg">${esc(d.message)}</div>`:''}</div>`
+  box.appendChild(el)
+  if ([2,5].includes(theme)) box.querySelectorAll('.alert:not(.out)').forEach((e,i,a)=>{ if(i<a.length-1) dismiss(e) })
+  setTimeout(()=>dismiss(el),7000)
+}
+function dismiss(el) { if(el.classList.contains('out')) return; el.classList.add('out'); setTimeout(()=>el.remove(),500) }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+</script>
+</body>
+</html>

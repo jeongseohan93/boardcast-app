@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>룰렛 오버레이</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: transparent;
+    font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+    overflow: hidden;
+    width: 1920px;
+    height: 1080px;
+  }
+
+  #container {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    opacity: 0;
+    transform: scale(0.9);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+    pointer-events: none;
+  }
+  #container.visible {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  /* 어두운 반투명 backdrop */
+  #backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 11, 15, 0.75);
+    opacity: 0;
+    transition: opacity 0.5s ease;
+  }
+  #backdrop.visible { opacity: 1; }
+
+  #wheel-wrap {
+    position: relative;
+    width: 520px;
+    height: 520px;
+    z-index: 10;
+  }
+
+  /* 포인터 (왼쪽 중앙) */
+  #pointer {
+    position: absolute;
+    left: -18px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 0;
+    height: 0;
+    border-top: 14px solid transparent;
+    border-bottom: 14px solid transparent;
+    border-left: 28px solid #00FFA3;
+    filter: drop-shadow(0 0 8px #00FFA3);
+    z-index: 20;
+  }
+
+  canvas { display: block; }
+
+  /* 기증자 정보 배너 */
+  #donor-info {
+    background: linear-gradient(135deg, #1a1c23ee, #252830ee);
+    border: 1px solid #00FFA355;
+    border-radius: 14px;
+    padding: 12px 28px;
+    text-align: center;
+    z-index: 10;
+    min-width: 320px;
+    animation: none;
+  }
+  #donor-name { color: #00FFA3; font-size: 18px; font-weight: 800; }
+  #donor-amount { color: #fff; font-size: 14px; margin-top: 2px; opacity: 0.8; }
+  #donor-message { color: #aaa; font-size: 13px; margin-top: 4px; }
+
+  /* 당첨 배너 */
+  #winner-banner {
+    position: fixed;
+    bottom: 120px;
+    left: 50%;
+    transform: translateX(-50%) translateY(30px);
+    opacity: 0;
+    background: linear-gradient(135deg, #1a1c23, #252830);
+    border: 2px solid #00FFA3;
+    border-radius: 20px;
+    padding: 24px 60px;
+    text-align: center;
+    z-index: 20;
+    transition: opacity 0.5s ease, transform 0.5s ease;
+    box-shadow: 0 0 40px #00FFA340, 0 8px 32px #00000080;
+  }
+  #winner-banner.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  #winner-label {
+    color: #00FFA3;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  #winner-name {
+    color: #fff;
+    font-size: 40px;
+    font-weight: 900;
+    text-shadow: 0 0 20px #00FFA360;
+  }
+
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 40px #00FFA340, 0 8px 32px #00000080; }
+    50% { box-shadow: 0 0 60px #00FFA380, 0 8px 32px #00000080; }
+  }
+  #winner-banner.show { animation: pulse 1.5s ease infinite; }
+</style>
+</head>
+<body>
+
+<div id="backdrop"></div>
+
+<div id="container">
+  <div id="wheel-wrap">
+    <div id="pointer"></div>
+    <canvas id="canvas" width="520" height="520"></canvas>
+  </div>
+  <div id="donor-info">
+    <div id="donor-name"></div>
+    <div id="donor-amount"></div>
+    <div id="donor-message"></div>
+  </div>
+</div>
+
+<div id="winner-banner">
+  <div id="winner-label">🎉 당첨!</div>
+  <div id="winner-name"></div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const COLORS = ['#00FFA3','#A78BFA','#F4A261','#72EFDD','#FF6B9D','#FFD166','#06D6A0','#C77DFF']
+const BG = '#17191D'
+
+const canvas   = document.getElementById('canvas')
+const ctx      = canvas.getContext('2d')
+const container = document.getElementById('container')
+const backdrop = document.getElementById('backdrop')
+const donorInfo = document.getElementById('donor-info')
+const donorName = document.getElementById('donor-name')
+const donorAmount = document.getElementById('donor-amount')
+const donorMsg  = document.getElementById('donor-message')
+const winnerBanner = document.getElementById('winner-banner')
+const winnerName   = document.getElementById('winner-name')
+
+let currentAngle = 0
+let hideTimer = null
+
+function drawWheel(items, angle) {
+  const cx = canvas.width / 2
+  const cy = canvas.height / 2
+  const r  = cx - 8
+
+  const total = items.reduce((s, i) => s + i.weight, 0)
+  ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+  let start = angle
+  items.forEach((item, idx) => {
+    const slice = (item.weight / total) * 2 * Math.PI
+
+    // 부채꼴
+    ctx.beginPath()
+    ctx.moveTo(cx, cy)
+    ctx.arc(cx, cy, r, start, start + slice)
+    ctx.closePath()
+    ctx.fillStyle = COLORS[idx % COLORS.length]
+    ctx.fill()
+    ctx.strokeStyle = BG
+    ctx.lineWidth = 2
+    ctx.stroke()
+
+    // 라벨
+    ctx.save()
+    ctx.translate(cx, cy)
+    ctx.rotate(start + slice / 2)
+    ctx.textAlign = 'right'
+    ctx.fillStyle = BG
+    ctx.font = 'bold 14px Segoe UI, Malgun Gothic, sans-serif'
+    const lbl = item.label.length > 10 ? item.label.slice(0, 10) + '…' : item.label
+    ctx.fillText(lbl, r - 14, 5)
+    ctx.restore()
+
+    start += slice
+  })
+
+  // 중앙 원
+  ctx.beginPath()
+  ctx.arc(cx, cy, 22, 0, 2 * Math.PI)
+  ctx.fillStyle = BG
+  ctx.fill()
+  ctx.strokeStyle = '#00FFA3'
+  ctx.lineWidth = 3
+  ctx.stroke()
+}
+
+function pickWinner(items, finalAngle) {
+  const total = items.reduce((s, i) => s + i.weight, 0)
+  // 포인터는 왼쪽(π) 방향이므로 normalizedAngle = π - finalAngle
+  const normalized = ((Math.PI - finalAngle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI)
+  let cumulative = 0
+  for (const item of items) {
+    cumulative += (item.weight / total) * 2 * Math.PI
+    if (normalized < cumulative) return item
+  }
+  return items[items.length - 1]
+}
+
+function spin(items, donation) {
+  // 이미 표시 중이면 초기화
+  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null }
+  winnerBanner.classList.remove('show')
+
+  // 후원자 정보 표시
+  donorName.textContent = donation.nickname
+  donorAmount.textContent = `${donation.amount.toLocaleString()} 치즈`
+  donorMsg.textContent = donation.message || ''
+
+  // 화면 표시
+  backdrop.classList.add('visible')
+  container.classList.add('visible')
+
+  // 초기 정적 그리기
+  drawWheel(items, currentAngle)
+
+  const stopAngle  = Math.random() * 2 * Math.PI
+  const totalRot   = (6 + Math.random() * 4) * 2 * Math.PI + stopAngle
+  const startTime  = performance.now()
+  const duration   = 5000
+  const startAngle = currentAngle
+
+  function animate(now) {
+    const elapsed  = now - startTime
+    const progress = Math.min(elapsed / duration, 1)
+    // ease out cubic
+    const eased    = 1 - Math.pow(1 - progress, 3)
+    const angle    = startAngle + totalRot * eased
+    drawWheel(items, angle)
+
+    if (progress < 1) {
+      requestAnimationFrame(animate)
+    } else {
+      currentAngle = angle % (2 * Math.PI)
+      const winner = pickWinner(items, currentAngle)
+
+      // 당첨 배너 표시
+      setTimeout(() => {
+        winnerName.textContent = winner.label
+        winnerBanner.classList.add('show')
+
+        // 8초 후 자동 숨김
+        hideTimer = setTimeout(() => {
+          winnerBanner.classList.remove('show')
+          backdrop.classList.remove('visible')
+          container.classList.remove('visible')
+          hideTimer = null
+        }, 8000)
+      }, 400)
+    }
+  }
+  requestAnimationFrame(animate)
+}
+
+// Socket.IO 연결
+const socket = io()
+socket.on('roulette:spin', (data) => {
+  if (!data.items || data.items.length < 2) return
+  spin(data.items, data.donation || { nickname: '???', amount: 0, message: '' })
+})
+
+// 초기 빈 휠 그리기
+drawWheel([
+  { label: '항목 1', weight: 1 },
+  { label: '항목 2', weight: 1 },
+  { label: '항목 3', weight: 1 },
+], 0)
+</script>
+</body>
+</html>

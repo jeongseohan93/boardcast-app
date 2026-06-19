@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>팔로우 알림</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:transparent; font-family:'Segoe UI','Malgun Gothic',sans-serif; overflow:hidden; }
+
+.alert { display:flex; align-items:center; gap:12px; color:#fff; }
+.alert.out { pointer-events:none; }
+.alert-icon { flex-shrink:0; }
+.alert-title { font-weight:800; }
+.alert-sub   { margin-top:2px; opacity:0.7; }
+
+@keyframes su  { from{opacity:0;transform:translateY(20px) scale(.95)} to{opacity:1;transform:none} }
+@keyframes fu  { from{opacity:1;transform:none} to{opacity:0;transform:translateY(-12px)} }
+@keyframes suf { from{opacity:0;transform:translateY(100%)} to{opacity:1;transform:none} }
+@keyframes sdf { from{opacity:1;transform:none} to{opacity:0;transform:translateY(100%)} }
+@keyframes si  { from{opacity:0;transform:scale(.8)} to{opacity:1;transform:none} }
+@keyframes so  { from{opacity:1;transform:none} to{opacity:0;transform:scale(1.08)} }
+@keyframes slr { from{opacity:0;transform:translateX(30px)} to{opacity:1;transform:none} }
+@keyframes flr { from{opacity:1;transform:none} to{opacity:0;transform:translateX(30px)} }
+@keyframes srl { from{opacity:0;transform:translateX(-30px)} to{opacity:1;transform:none} }
+@keyframes frl { from{opacity:1;transform:none} to{opacity:0;transform:translateX(-30px)} }
+@keyframes sd  { from{opacity:0;transform:translateY(-100%)} to{opacity:1;transform:none} }
+@keyframes fsd { from{opacity:1;transform:none} to{opacity:0;transform:translateY(-100%)} }
+@keyframes hb  { from{transform:scale(1)} to{transform:scale(1.12)} }
+
+/* ── 1: 카드형 (상단 우측) ── */
+[data-theme="1"] #a { position:fixed;top:20px;right:20px;width:300px; }
+[data-theme="1"] .alert { background:linear-gradient(135deg,#1a1c23ee,#252830ee);border:1px solid #06D6A0;border-radius:14px;padding:14px 18px;margin-bottom:10px;box-shadow:0 0 20px #06D6A040,0 4px 20px #00000060;animation:slr .4s cubic-bezier(.175,.885,.32,1.275) forwards; }
+[data-theme="1"] .alert.out { animation:flr .35s ease forwards; }
+[data-theme="1"] .alert-icon  { font-size:28px; }
+[data-theme="1"] .alert-title { color:#06D6A0;font-size:15px; }
+[data-theme="1"] .alert-sub   { color:#8B8FA8;font-size:13px; }
+
+/* ── 2: 슬라이드형 (상단 중앙 배너) ── */
+[data-theme="2"] #a { position:fixed;top:0;left:0;right:0; }
+[data-theme="2"] .alert { background:linear-gradient(90deg,transparent,#1a1c23f0 20%,#1a1c23f0 80%,transparent);border-bottom:2px solid #06D6A0;padding:14px 40px;justify-content:center;gap:16px;animation:sd .5s ease forwards; }
+[data-theme="2"] .alert.out { animation:fsd .4s ease forwards; }
+[data-theme="2"] .alert-icon  { font-size:26px; }
+[data-theme="2"] .alert-title { color:#06D6A0;font-size:17px; }
+[data-theme="2"] .alert-sub   { font-size:14px;color:#aaa; }
+
+/* ── 3: 하트형 (화면 중앙) ── */
+[data-theme="3"] #a { position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none; }
+[data-theme="3"] .alert { background:radial-gradient(ellipse at center,#1a1c23f8 60%,transparent);border-radius:24px;padding:36px 60px;flex-direction:column;text-align:center;gap:12px;animation:si .6s cubic-bezier(.175,.885,.32,1.275) forwards; }
+[data-theme="3"] .alert.out   { animation:so .5s ease forwards; }
+[data-theme="3"] .alert-icon  { font-size:72px;animation:hb 0.7s ease infinite alternate; }
+[data-theme="3"] .alert-title { color:#FF6B9D;font-size:24px;text-shadow:0 0 20px #FF6B9D80; }
+[data-theme="3"] .alert-sub   { color:#ccc;font-size:16px; }
+
+/* ── 4: 하단카드형 (하단 우측) ── */
+[data-theme="4"] #a { position:fixed;bottom:20px;right:20px;width:300px; }
+[data-theme="4"] .alert { background:linear-gradient(135deg,#1a1c23ee,#252830ee);border:1px solid #06D6A0;border-radius:14px;padding:14px 18px;margin-bottom:10px;box-shadow:0 0 20px #06D6A040,0 4px 20px #00000060;animation:slr .4s cubic-bezier(.175,.885,.32,1.275) forwards; }
+[data-theme="4"] .alert.out   { animation:flr .35s ease forwards; }
+[data-theme="4"] .alert-icon  { font-size:26px; }
+[data-theme="4"] .alert-title { color:#06D6A0;font-size:14px; }
+[data-theme="4"] .alert-sub   { color:#8B8FA8;font-size:12px; }
+
+/* ── 5: 상단좌측형 ── */
+[data-theme="5"] #a { position:fixed;top:20px;left:20px;width:300px; }
+[data-theme="5"] .alert { background:linear-gradient(135deg,#1a1c23ee,#252830ee);border:1px solid #06D6A0;border-radius:14px;padding:14px 18px;margin-bottom:10px;box-shadow:0 0 20px #06D6A040,0 4px 20px #00000060;animation:srl .4s cubic-bezier(.175,.885,.32,1.275) forwards; }
+[data-theme="5"] .alert.out   { animation:frl .35s ease forwards; }
+[data-theme="5"] .alert-icon  { font-size:26px; }
+[data-theme="5"] .alert-title { color:#06D6A0;font-size:14px; }
+[data-theme="5"] .alert-sub   { color:#8B8FA8;font-size:12px; }
+
+/* ── 6: 팝업형 (화면 중앙) ── */
+[data-theme="6"] #a { position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none; }
+[data-theme="6"] .alert { background:linear-gradient(145deg,#1e2028,#252830);border:2px solid #06D6A0;border-radius:20px;padding:28px 36px;flex-direction:column;text-align:center;gap:10px;max-width:420px;box-shadow:0 0 60px #00000080,0 0 30px #06D6A020;animation:si .5s cubic-bezier(.175,.885,.32,1.275) forwards; }
+[data-theme="6"] .alert.out   { animation:so .4s ease forwards; }
+[data-theme="6"] .alert-icon  { font-size:52px; }
+[data-theme="6"] .alert-title { color:#06D6A0;font-size:22px; }
+[data-theme="6"] .alert-sub   { color:#aaa;font-size:15px; }
+
+/* ── 7: 토스트형 (하단 좌측) ── */
+[data-theme="7"] #a { position:fixed;bottom:20px;left:20px;width:320px; }
+[data-theme="7"] .alert { background:#1a1c23f5;border-left:3px solid #06D6A0;border-radius:10px;padding:12px 16px;margin-bottom:8px;box-shadow:0 4px 24px #00000060;animation:srl .4s cubic-bezier(.175,.885,.32,1.275) forwards; }
+[data-theme="7"] .alert.out   { animation:frl .3s ease forwards; }
+[data-theme="7"] .alert-icon  { font-size:24px; }
+[data-theme="7"] .alert-title { color:#06D6A0;font-size:14px; }
+[data-theme="7"] .alert-sub   { color:#8B8FA8;font-size:12px; }
+
+/* ── 8: 원형형 (중앙 pill) ── */
+[data-theme="8"] #a { position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none; }
+[data-theme="8"] .alert { background:linear-gradient(135deg,#1a1c23f8,#252830f8);border:2px solid #06D6A0;border-radius:50px;padding:16px 32px;gap:14px;box-shadow:0 0 30px #06D6A030,0 8px 40px #00000060;animation:si .5s cubic-bezier(.175,.885,.32,1.275) forwards; }
+[data-theme="8"] .alert.out   { animation:so .4s ease forwards; }
+[data-theme="8"] .alert-icon  { font-size:32px; }
+[data-theme="8"] .alert-title { color:#06D6A0;font-size:20px; }
+[data-theme="8"] .alert-sub   { color:#aaa;font-size:14px; }
+
+/* ── 9: 리본형 (하단 전체) ── */
+[data-theme="9"] #a { position:fixed;bottom:0;left:0;right:0; }
+[data-theme="9"] .alert { background:linear-gradient(90deg,transparent,#1a1c23f0 20%,#1a1c23f0 80%,transparent);border-top:2px solid #06D6A0;padding:16px 40px;justify-content:center;gap:16px;animation:suf .5s ease forwards; }
+[data-theme="9"] .alert.out   { animation:sdf .4s ease forwards; }
+[data-theme="9"] .alert-icon  { font-size:28px; }
+[data-theme="9"] .alert-title { color:#06D6A0;font-size:18px; }
+[data-theme="9"] .alert-sub   { color:#aaa;font-size:14px; }
+
+/* ── 10: 측면형 (우측 세로 패널) ── */
+[data-theme="10"] #a { position:fixed;top:0;right:0;bottom:0;width:280px;display:flex;flex-direction:column;justify-content:center;padding:20px; }
+[data-theme="10"] .alert { background:linear-gradient(180deg,#1a1c23ee,#0f1115ee);border:1px solid #06D6A080;border-radius:14px;padding:20px 18px;margin-bottom:12px;flex-direction:column;align-items:flex-start;gap:8px;box-shadow:-4px 0 30px #00000060;animation:slr .4s cubic-bezier(.175,.885,.32,1.275) forwards; }
+[data-theme="10"] .alert.out   { animation:flr .35s ease forwards; }
+[data-theme="10"] .alert-icon  { font-size:36px; }
+[data-theme="10"] .alert-title { color:#06D6A0;font-size:16px; }
+[data-theme="10"] .alert-sub   { color:#aaa;font-size:12px; }
+</style>
+</head>
+<body>
+<div id="a"></div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const theme = parseInt(new URLSearchParams(location.search).get('theme') || '1')
+document.body.dataset.theme = theme
+const socket = io()
+const box = document.getElementById('a')
+socket.on('follow', show)
+function show(d) {
+  const el = document.createElement('div')
+  el.className = 'alert'
+  el.innerHTML = `<div class="alert-icon">❤️</div><div class="alert-body"><div class="alert-title">새 팔로우!</div><div class="alert-sub">팔로워 ${(d.followerCount||0).toLocaleString()}명</div></div>`
+  box.appendChild(el)
+  if ([2,9].includes(theme)) box.querySelectorAll('.alert:not(.out)').forEach((e,i,a)=>{ if(i<a.length-1) dismiss(e) })
+  setTimeout(()=>dismiss(el),5000)
+}
+function dismiss(el) { if(el.classList.contains('out')) return; el.classList.add('out'); setTimeout(()=>el.remove(),600) }
+</script>
+</body>
+</html>
