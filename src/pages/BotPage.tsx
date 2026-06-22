@@ -185,7 +185,7 @@ export default function BotPage() {
           </ul>
           <div className="mt-3 p-2.5 bg-bg-outer rounded-xl">
             <p className="text-xs text-text-muted">
-              채팅 전송은 <span className="text-text-secondary">현재 로그인된 계정</span>으로 전송됩니다.
+              채팅 전송은 <span className="text-text-secondary">스트리머 계정</span>으로 전송됩니다.
             </p>
           </div>
         </div>

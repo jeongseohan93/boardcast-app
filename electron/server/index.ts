@@ -180,6 +180,60 @@ function secureGetFromStore(store: InstanceType<typeof Store>, key: string): str
   return store.get(`secure_${key}_plain`) as string | null ?? null
 }
 
+function secureSetInStore(store: InstanceType<typeof Store>, key: string, value: string) {
+  try {
+    const enc = safeStorage.encryptString(value)
+    store.set(`secure_${key}`, enc.toString('base64'))
+  } catch {
+    store.set(`secure_${key}_plain`, value)
+  }
+}
+
+async function tryRefreshToken(): Promise<string | null> {
+  const store = new Store()
+  const refreshToken = secureGetFromStore(store, 'refreshToken')
+  const clientId = secureGetFromStore(store, 'clientId')
+  const clientSecret = secureGetFromStore(store, 'clientSecret')
+
+  if (!refreshToken || !clientId || !clientSecret) {
+    console.log('[Server] Token refresh skipped: missing refreshToken or credentials')
+    return null
+  }
+
+  try {
+    console.log('[Server] Refreshing access token...')
+    const res = await axios.post('https://chzzk.naver.com/auth/v1/token', {
+      grantType: 'refresh_token',
+      clientId,
+      clientSecret,
+      refreshToken,
+    }, { headers: { 'Content-Type': 'application/json' } })
+
+    const d = res.data.content ?? res.data
+    const newAccessToken: string = d.access_token ?? d.accessToken
+    const newRefreshToken: string | undefined = d.refresh_token ?? d.refreshToken
+    const expiresIn: number = d.expires_in ?? d.expiresIn ?? 3600
+
+    if (!newAccessToken) {
+      console.error('[Server] Token refresh failed: no access_token in response', res.data)
+      return null
+    }
+
+    secureSetInStore(store, 'accessToken', newAccessToken)
+    if (newRefreshToken) secureSetInStore(store, 'refreshToken', newRefreshToken)
+    store.set('tokenExpiresAt', Date.now() + expiresIn * 1000)
+
+    console.log('[Server] Token refreshed successfully')
+    return newAccessToken
+  } catch (err) {
+    const detail = axios.isAxiosError(err)
+      ? `HTTP ${err.response?.status}: ${JSON.stringify(err.response?.data)}`
+      : String(err)
+    console.error('[Server] Token refresh API failed:', detail)
+    return null
+  }
+}
+
 function restoreSessionOnStartup() {
   try {
     const store = new Store()
@@ -216,7 +270,7 @@ export function initChzzkSession(accessToken: string, channelId: string, clientI
   if (chzzkSession) {
     chzzkSession.disconnect()
   }
-  chzzkSession = new ChzzkSession(accessToken, channelId, clientId, clientSecret, io)
+  chzzkSession = new ChzzkSession(accessToken, channelId, clientId, clientSecret, io, tryRefreshToken)
   chzzkSession.connect().catch((err) => console.error('[ChzzkSession] Unhandled connect error:', err))
 }
 
