@@ -8,25 +8,25 @@ export default {
     extend: {
       colors: {
         bg: {
-          outer: '#17191D',
-          sidebar: '#1E2028',
-          card: '#252830',
-          input: '#1A1C23',
+          outer: 'rgb(var(--bg-outer) / <alpha-value>)',
+          sidebar: 'rgb(var(--bg-sidebar) / <alpha-value>)',
+          card: 'rgb(var(--bg-card) / <alpha-value>)',
+          input: 'rgb(var(--bg-input) / <alpha-value>)',
         },
         text: {
-          primary: '#FFFFFF',
-          secondary: '#8B8FA8',
-          muted: '#4F5368',
+          primary: 'rgb(var(--text-primary) / <alpha-value>)',
+          secondary: 'rgb(var(--text-secondary) / <alpha-value>)',
+          muted: 'rgb(var(--text-muted) / <alpha-value>)',
         },
         accent: {
-          mint: '#00FFA3',
-          danger: '#F06060',
-          warning: '#F0A060',
-          success: '#31C27C',
-          purple: '#A78BFA',
+          mint: 'rgb(var(--accent-mint) / <alpha-value>)',
+          danger: 'rgb(var(--accent-danger) / <alpha-value>)',
+          warning: 'rgb(var(--accent-warning) / <alpha-value>)',
+          success: 'rgb(var(--accent-success) / <alpha-value>)',
+          purple: 'rgb(var(--accent-purple) / <alpha-value>)',
         },
         border: {
-          DEFAULT: '#2E3041',
+          DEFAULT: 'rgb(var(--border-color) / <alpha-value>)',
         },
       },
       fontFamily: {

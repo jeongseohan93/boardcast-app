@@ -5,127 +5,311 @@
 <title>팔로우 알림</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
-body { background:transparent; font-family:'Segoe UI','Malgun Gothic',sans-serif; overflow:hidden; }
+body { background:transparent; font-family:'Malgun Gothic','Segoe UI',sans-serif; overflow:hidden; }
 
-.alert { display:flex; align-items:center; gap:12px; color:#fff; }
-.alert.out { pointer-events:none; }
-.alert-icon { flex-shrink:0; }
-.alert-title { font-weight:800; }
-.alert-sub   { margin-top:2px; opacity:0.7; }
+#wrap { position:fixed; pointer-events:none; z-index:9999; }
 
-@keyframes su  { from{opacity:0;transform:translateY(20px) scale(.95)} to{opacity:1;transform:none} }
-@keyframes fu  { from{opacity:1;transform:none} to{opacity:0;transform:translateY(-12px)} }
-@keyframes suf { from{opacity:0;transform:translateY(100%)} to{opacity:1;transform:none} }
-@keyframes sdf { from{opacity:1;transform:none} to{opacity:0;transform:translateY(100%)} }
-@keyframes si  { from{opacity:0;transform:scale(.8)} to{opacity:1;transform:none} }
-@keyframes so  { from{opacity:1;transform:none} to{opacity:0;transform:scale(1.08)} }
-@keyframes slr { from{opacity:0;transform:translateX(30px)} to{opacity:1;transform:none} }
-@keyframes flr { from{opacity:1;transform:none} to{opacity:0;transform:translateX(30px)} }
-@keyframes srl { from{opacity:0;transform:translateX(-30px)} to{opacity:1;transform:none} }
-@keyframes frl { from{opacity:1;transform:none} to{opacity:0;transform:translateX(-30px)} }
-@keyframes sd  { from{opacity:0;transform:translateY(-100%)} to{opacity:1;transform:none} }
-@keyframes fsd { from{opacity:1;transform:none} to{opacity:0;transform:translateY(-100%)} }
-@keyframes hb  { from{transform:scale(1)} to{transform:scale(1.12)} }
+.alert {
+  display:flex;
+  align-items:center;
+  gap:14px;
+  color:#fff;
+  animation:popIn .4s cubic-bezier(.17,.67,.26,1.2) both;
+}
+.alert.out { animation:popOut .3s ease forwards !important; }
 
-/* ── 1: 카드형 (상단 우측) ── */
-[data-theme="1"] #a { position:fixed;top:20px;right:20px;width:300px; }
-[data-theme="1"] .alert { background:linear-gradient(135deg,#1a1c23ee,#252830ee);border:1px solid #06D6A0;border-radius:14px;padding:14px 18px;margin-bottom:10px;box-shadow:0 0 20px #06D6A040,0 4px 20px #00000060;animation:slr .4s cubic-bezier(.175,.885,.32,1.275) forwards; }
-[data-theme="1"] .alert.out { animation:flr .35s ease forwards; }
-[data-theme="1"] .alert-icon  { font-size:28px; }
-[data-theme="1"] .alert-title { color:#06D6A0;font-size:15px; }
-[data-theme="1"] .alert-sub   { color:#8B8FA8;font-size:13px; }
+.alert-icon  { font-size:32px; flex-shrink:0; }
+.alert-body  { display:flex; flex-direction:column; gap:2px; }
+.alert-title { font-weight:900; font-size:17px; }
+.alert-sub   { font-size:13px; opacity:.7; }
 
-/* ── 2: 슬라이드형 (상단 중앙 배너) ── */
-[data-theme="2"] #a { position:fixed;top:0;left:0;right:0; }
-[data-theme="2"] .alert { background:linear-gradient(90deg,transparent,#1a1c23f0 20%,#1a1c23f0 80%,transparent);border-bottom:2px solid #06D6A0;padding:14px 40px;justify-content:center;gap:16px;animation:sd .5s ease forwards; }
-[data-theme="2"] .alert.out { animation:fsd .4s ease forwards; }
-[data-theme="2"] .alert-icon  { font-size:26px; }
-[data-theme="2"] .alert-title { color:#06D6A0;font-size:17px; }
-[data-theme="2"] .alert-sub   { font-size:14px;color:#aaa; }
+@keyframes popIn  { from{opacity:0;transform:scale(.88) translateY(12px)} to{opacity:1;transform:none} }
+@keyframes popOut { to{opacity:0;transform:scale(.94) translateY(-10px)} }
+@keyframes slideR { from{opacity:0;transform:translateX(40px)}  to{opacity:1;transform:none} }
+@keyframes slideL { from{opacity:0;transform:translateX(-40px)} to{opacity:1;transform:none} }
+@keyframes slideD { from{opacity:0;transform:translateY(-100%)} to{opacity:1;transform:none} }
+@keyframes slideU { from{opacity:0;transform:translateY(100%)}  to{opacity:1;transform:none} }
+@keyframes outR   { to{opacity:0;transform:translateX(40px)} }
+@keyframes outL   { to{opacity:0;transform:translateX(-40px)} }
+@keyframes outU   { to{opacity:0;transform:translateY(-100%)} }
+@keyframes outD   { to{opacity:0;transform:translateY(100%)} }
+@keyframes scaleIn  { from{opacity:0;transform:scale(.8)}   to{opacity:1;transform:scale(1)} }
+@keyframes scaleOut { to{opacity:0;transform:scale(1.08)} }
+@keyframes hb { from{transform:scale(1)} to{transform:scale(1.15)} }
 
-/* ── 3: 하트형 (화면 중앙) ── */
-[data-theme="3"] #a { position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none; }
-[data-theme="3"] .alert { background:radial-gradient(ellipse at center,#1a1c23f8 60%,transparent);border-radius:24px;padding:36px 60px;flex-direction:column;text-align:center;gap:12px;animation:si .6s cubic-bezier(.175,.885,.32,1.275) forwards; }
-[data-theme="3"] .alert.out   { animation:so .5s ease forwards; }
-[data-theme="3"] .alert-icon  { font-size:72px;animation:hb 0.7s ease infinite alternate; }
-[data-theme="3"] .alert-title { color:#FF6B9D;font-size:24px;text-shadow:0 0 20px #FF6B9D80; }
-[data-theme="3"] .alert-sub   { color:#ccc;font-size:16px; }
+/* ═══════════════════════════════════
+   1. 카드 — 우상단 (청록)
+═══════════════════════════════════ */
+body[data-theme="1"] { --accent:#06D6A0; }
+body[data-theme="1"] #wrap { top:24px; right:24px; width:300px; }
+body[data-theme="1"] .alert {
+  background:linear-gradient(135deg,rgba(22,26,30,.96),rgba(32,38,44,.96));
+  border:1.5px solid var(--accent);
+  border-radius:14px;
+  padding:14px 18px;
+  box-shadow:0 0 20px rgba(6,214,160,.25),0 6px 24px rgba(0,0,0,.6);
+  animation:slideR .4s cubic-bezier(.17,.67,.26,1.2) both;
+}
+body[data-theme="1"] .alert.out   { animation:outR .35s ease forwards !important; }
+body[data-theme="1"] .alert-title { color:var(--accent); }
 
-/* ── 4: 하단카드형 (하단 우측) ── */
-[data-theme="4"] #a { position:fixed;bottom:20px;right:20px;width:300px; }
-[data-theme="4"] .alert { background:linear-gradient(135deg,#1a1c23ee,#252830ee);border:1px solid #06D6A0;border-radius:14px;padding:14px 18px;margin-bottom:10px;box-shadow:0 0 20px #06D6A040,0 4px 20px #00000060;animation:slr .4s cubic-bezier(.175,.885,.32,1.275) forwards; }
-[data-theme="4"] .alert.out   { animation:flr .35s ease forwards; }
-[data-theme="4"] .alert-icon  { font-size:26px; }
-[data-theme="4"] .alert-title { color:#06D6A0;font-size:14px; }
-[data-theme="4"] .alert-sub   { color:#8B8FA8;font-size:12px; }
+/* ═══════════════════════════════════
+   2. 슬라이드 — 상단 배너 (스카이)
+═══════════════════════════════════ */
+body[data-theme="2"] { --accent:#38BDF8; }
+body[data-theme="2"] #wrap { top:0; left:0; right:0; }
+body[data-theme="2"] .alert {
+  justify-content:center;
+  padding:14px 40px;
+  background:linear-gradient(90deg,transparent,rgba(10,20,32,.96) 15%,rgba(10,20,32,.96) 85%,transparent);
+  border-bottom:2px solid var(--accent);
+  animation:slideD .45s ease both;
+}
+body[data-theme="2"] .alert.out   { animation:outU .35s ease forwards !important; }
+body[data-theme="2"] .alert-title { color:var(--accent); font-size:19px; }
+body[data-theme="2"] .alert-sub   { font-size:14px; }
 
-/* ── 5: 상단좌측형 ── */
-[data-theme="5"] #a { position:fixed;top:20px;left:20px;width:300px; }
-[data-theme="5"] .alert { background:linear-gradient(135deg,#1a1c23ee,#252830ee);border:1px solid #06D6A0;border-radius:14px;padding:14px 18px;margin-bottom:10px;box-shadow:0 0 20px #06D6A040,0 4px 20px #00000060;animation:srl .4s cubic-bezier(.175,.885,.32,1.275) forwards; }
-[data-theme="5"] .alert.out   { animation:frl .35s ease forwards; }
-[data-theme="5"] .alert-icon  { font-size:26px; }
-[data-theme="5"] .alert-title { color:#06D6A0;font-size:14px; }
-[data-theme="5"] .alert-sub   { color:#8B8FA8;font-size:12px; }
+/* ═══════════════════════════════════
+   3. 하트 — 중앙 (핑크)
+═══════════════════════════════════ */
+body[data-theme="3"] { --accent:#FF6B9D; }
+body[data-theme="3"] #wrap { inset:0; display:flex; align-items:center; justify-content:center; }
+body[data-theme="3"] .alert {
+  flex-direction:column;
+  text-align:center;
+  gap:14px;
+  padding:40px 64px;
+  animation:scaleIn .5s cubic-bezier(.17,.67,.26,1.3) both;
+}
+body[data-theme="3"] .alert.out   { animation:scaleOut .4s ease forwards !important; }
+body[data-theme="3"] .alert-icon  { font-size:80px; animation:hb .7s ease infinite alternate; }
+body[data-theme="3"] .alert-title { color:var(--accent); font-size:28px; text-shadow:0 0 28px rgba(255,107,157,.6); }
+body[data-theme="3"] .alert-sub   { font-size:17px; color:#ccc; }
 
-/* ── 6: 팝업형 (화면 중앙) ── */
-[data-theme="6"] #a { position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none; }
-[data-theme="6"] .alert { background:linear-gradient(145deg,#1e2028,#252830);border:2px solid #06D6A0;border-radius:20px;padding:28px 36px;flex-direction:column;text-align:center;gap:10px;max-width:420px;box-shadow:0 0 60px #00000080,0 0 30px #06D6A020;animation:si .5s cubic-bezier(.175,.885,.32,1.275) forwards; }
-[data-theme="6"] .alert.out   { animation:so .4s ease forwards; }
-[data-theme="6"] .alert-icon  { font-size:52px; }
-[data-theme="6"] .alert-title { color:#06D6A0;font-size:22px; }
-[data-theme="6"] .alert-sub   { color:#aaa;font-size:15px; }
+/* ═══════════════════════════════════
+   4. 하단 카드 — 우하단 (퍼플)
+═══════════════════════════════════ */
+body[data-theme="4"] { --accent:#A78BFA; }
+body[data-theme="4"] #wrap { bottom:24px; right:24px; width:300px; }
+body[data-theme="4"] .alert {
+  background:linear-gradient(135deg,rgba(18,12,28,.96),rgba(28,20,42,.96));
+  border:1.5px solid var(--accent);
+  border-radius:14px;
+  padding:14px 18px;
+  box-shadow:0 0 20px rgba(167,139,250,.2),0 6px 24px rgba(0,0,0,.6);
+  animation:slideR .4s cubic-bezier(.17,.67,.26,1.2) both;
+}
+body[data-theme="4"] .alert.out   { animation:outR .35s ease forwards !important; }
+body[data-theme="4"] .alert-title { color:var(--accent); }
 
-/* ── 7: 토스트형 (하단 좌측) ── */
-[data-theme="7"] #a { position:fixed;bottom:20px;left:20px;width:320px; }
-[data-theme="7"] .alert { background:#1a1c23f5;border-left:3px solid #06D6A0;border-radius:10px;padding:12px 16px;margin-bottom:8px;box-shadow:0 4px 24px #00000060;animation:srl .4s cubic-bezier(.175,.885,.32,1.275) forwards; }
-[data-theme="7"] .alert.out   { animation:frl .3s ease forwards; }
-[data-theme="7"] .alert-icon  { font-size:24px; }
-[data-theme="7"] .alert-title { color:#06D6A0;font-size:14px; }
-[data-theme="7"] .alert-sub   { color:#8B8FA8;font-size:12px; }
+/* ═══════════════════════════════════
+   5. 좌측 카드 — 좌상단 (옐로우)
+═══════════════════════════════════ */
+body[data-theme="5"] { --accent:#FFD166; }
+body[data-theme="5"] #wrap { top:24px; left:24px; width:300px; }
+body[data-theme="5"] .alert {
+  background:linear-gradient(135deg,rgba(28,22,8,.96),rgba(38,30,12,.96));
+  border:1.5px solid var(--accent);
+  border-radius:14px;
+  padding:14px 18px;
+  box-shadow:0 0 20px rgba(255,209,102,.2),0 6px 24px rgba(0,0,0,.6);
+  animation:slideL .4s cubic-bezier(.17,.67,.26,1.2) both;
+}
+body[data-theme="5"] .alert.out   { animation:outL .35s ease forwards !important; }
+body[data-theme="5"] .alert-title { color:var(--accent); }
 
-/* ── 8: 원형형 (중앙 pill) ── */
-[data-theme="8"] #a { position:fixed;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none; }
-[data-theme="8"] .alert { background:linear-gradient(135deg,#1a1c23f8,#252830f8);border:2px solid #06D6A0;border-radius:50px;padding:16px 32px;gap:14px;box-shadow:0 0 30px #06D6A030,0 8px 40px #00000060;animation:si .5s cubic-bezier(.175,.885,.32,1.275) forwards; }
-[data-theme="8"] .alert.out   { animation:so .4s ease forwards; }
-[data-theme="8"] .alert-icon  { font-size:32px; }
-[data-theme="8"] .alert-title { color:#06D6A0;font-size:20px; }
-[data-theme="8"] .alert-sub   { color:#aaa;font-size:14px; }
+/* ═══════════════════════════════════
+   6. 팝업 — 중앙 대형 (핫핑크)
+═══════════════════════════════════ */
+body[data-theme="6"] { --accent:#F472B6; }
+body[data-theme="6"] #wrap { inset:0; display:flex; align-items:center; justify-content:center; }
+body[data-theme="6"] .alert {
+  flex-direction:column;
+  text-align:center;
+  gap:12px;
+  padding:32px 52px;
+  max-width:440px;
+  background:linear-gradient(145deg,rgba(26,16,30,.98),rgba(36,22,42,.98));
+  border:2px solid var(--accent);
+  border-radius:24px;
+  box-shadow:0 0 64px rgba(0,0,0,.9),0 0 32px rgba(244,114,182,.22);
+  animation:scaleIn .5s cubic-bezier(.17,.67,.26,1.2) both;
+}
+body[data-theme="6"] .alert.out   { animation:scaleOut .4s ease forwards !important; }
+body[data-theme="6"] .alert-icon  { font-size:56px; }
+body[data-theme="6"] .alert-title { color:var(--accent); font-size:24px; }
+body[data-theme="6"] .alert-sub   { color:#bbb; font-size:15px; }
 
-/* ── 9: 리본형 (하단 전체) ── */
-[data-theme="9"] #a { position:fixed;bottom:0;left:0;right:0; }
-[data-theme="9"] .alert { background:linear-gradient(90deg,transparent,#1a1c23f0 20%,#1a1c23f0 80%,transparent);border-top:2px solid #06D6A0;padding:16px 40px;justify-content:center;gap:16px;animation:suf .5s ease forwards; }
-[data-theme="9"] .alert.out   { animation:sdf .4s ease forwards; }
-[data-theme="9"] .alert-icon  { font-size:28px; }
-[data-theme="9"] .alert-title { color:#06D6A0;font-size:18px; }
-[data-theme="9"] .alert-sub   { color:#aaa;font-size:14px; }
+/* ═══════════════════════════════════
+   7. 토스트 — 좌하단 (라이트블루)
+═══════════════════════════════════ */
+body[data-theme="7"] { --accent:#60A5FA; }
+body[data-theme="7"] #wrap { bottom:24px; left:0; max-width:360px; }
+body[data-theme="7"] .alert {
+  background:rgba(8,14,22,.92);
+  border-left:4px solid var(--accent);
+  border-radius:0 12px 12px 0;
+  padding:12px 20px;
+  box-shadow:0 4px 24px rgba(0,0,0,.65);
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+  animation:slideL .4s cubic-bezier(.17,.67,.26,1.2) both;
+}
+body[data-theme="7"] .alert.out   { animation:outL .3s ease forwards !important; }
+body[data-theme="7"] .alert-title { color:var(--accent); font-size:15px; }
 
-/* ── 10: 측면형 (우측 세로 패널) ── */
-[data-theme="10"] #a { position:fixed;top:0;right:0;bottom:0;width:280px;display:flex;flex-direction:column;justify-content:center;padding:20px; }
-[data-theme="10"] .alert { background:linear-gradient(180deg,#1a1c23ee,#0f1115ee);border:1px solid #06D6A080;border-radius:14px;padding:20px 18px;margin-bottom:12px;flex-direction:column;align-items:flex-start;gap:8px;box-shadow:-4px 0 30px #00000060;animation:slr .4s cubic-bezier(.175,.885,.32,1.275) forwards; }
-[data-theme="10"] .alert.out   { animation:flr .35s ease forwards; }
-[data-theme="10"] .alert-icon  { font-size:36px; }
-[data-theme="10"] .alert-title { color:#06D6A0;font-size:16px; }
-[data-theme="10"] .alert-sub   { color:#aaa;font-size:12px; }
+/* ═══════════════════════════════════
+   8. 필 — 중앙 (그린)
+═══════════════════════════════════ */
+body[data-theme="8"] { --accent:#34D399; }
+body[data-theme="8"] #wrap { inset:0; display:flex; align-items:center; justify-content:center; }
+body[data-theme="8"] .alert {
+  background:linear-gradient(135deg,rgba(14,26,20,.97),rgba(22,38,30,.97));
+  border:2px solid var(--accent);
+  border-radius:60px;
+  padding:18px 44px;
+  box-shadow:0 0 32px rgba(52,211,153,.25),0 8px 40px rgba(0,0,0,.65);
+  animation:scaleIn .45s cubic-bezier(.17,.67,.26,1.2) both;
+}
+body[data-theme="8"] .alert.out   { animation:scaleOut .35s ease forwards !important; }
+body[data-theme="8"] .alert-title { color:var(--accent); font-size:21px; }
+
+/* ═══════════════════════════════════
+   9. 리본 — 하단 배너 (오렌지)
+═══════════════════════════════════ */
+body[data-theme="9"] { --accent:#FB923C; }
+body[data-theme="9"] #wrap { bottom:0; left:0; right:0; }
+body[data-theme="9"] .alert {
+  justify-content:center;
+  padding:16px 40px;
+  background:linear-gradient(90deg,transparent,rgba(24,14,6,.96) 15%,rgba(24,14,6,.96) 85%,transparent);
+  border-top:2px solid var(--accent);
+  animation:slideU .45s ease both;
+}
+body[data-theme="9"] .alert.out   { animation:outD .35s ease forwards !important; }
+body[data-theme="9"] .alert-title { color:var(--accent); font-size:19px; }
+body[data-theme="9"] .alert-sub   { font-size:14px; }
+
+/* ═══════════════════════════════════
+   10. 사이드 — 우측 패널 (바이올렛)
+═══════════════════════════════════ */
+body[data-theme="10"] { --accent:#7C3AED; }
+body[data-theme="10"] #wrap {
+  top:0; right:0; bottom:0;
+  width:280px;
+  display:flex; flex-direction:column; justify-content:center;
+  padding:20px;
+}
+body[data-theme="10"] .alert {
+  flex-direction:column;
+  align-items:flex-start;
+  gap:8px;
+  background:linear-gradient(180deg,rgba(18,12,28,.97),rgba(10,8,20,.97));
+  border:1px solid rgba(124,58,237,.5);
+  border-radius:14px;
+  padding:20px 18px;
+  box-shadow:-4px 0 32px rgba(0,0,0,.65);
+  animation:slideR .4s cubic-bezier(.17,.67,.26,1.2) both;
+}
+body[data-theme="10"] .alert.out   { animation:outR .35s ease forwards !important; }
+body[data-theme="10"] .alert-icon  { font-size:38px; }
+body[data-theme="10"] .alert-title { color:var(--accent); font-size:17px; }
+body[data-theme="10"] .alert-sub   { font-size:12px; color:#aaa; }
 </style>
 </head>
 <body>
-<div id="a"></div>
+<div id="wrap"></div>
 <script src="/socket.io/socket.io.js"></script>
 <script>
-const theme = parseInt(new URLSearchParams(location.search).get('theme') || '1')
-document.body.dataset.theme = theme
+const p       = new URLSearchParams(location.search)
+const preview = p.get('preview') === '1'
+const showMs  = preview ? 0 : parseInt(p.get('showMs') || '5') * 1000
+const fontSz  = parseInt(p.get('fontSize') || '0')
+const wrap    = document.getElementById('wrap')
+
+let theme = parseInt(p.get('theme') || '1')
+setTheme(theme)
+
+fetch('/api/overlay/themes')
+  .then(r => r.json())
+  .then(d => { if (d.follow) setTheme(d.follow) })
+  .catch(() => {})
+
 const socket = io()
-const box = document.getElementById('a')
-socket.on('follow', show)
-function show(d) {
+socket.on('theme:update', d => { if (d.follow) setTheme(d.follow) })
+socket.on('follow', showAlert)
+
+function setTheme(t) {
+  theme = t
+  document.body.dataset.theme = String(t)
+}
+
+// 설정 캐시 (30초 TTL — 미리보기 새로고침 없이도 이미지 변경 반영)
+let _settings = null
+let _settingsAt = 0
+const SETTINGS_TTL = 30000
+function getSettings() {
+  if (_settings && Date.now() - _settingsAt < SETTINGS_TTL) return Promise.resolve(_settings)
+  return fetch('/api/overlay/settings')
+    .then(r => r.ok ? r.json() : {})
+    .then(d => { _settings = d; _settingsAt = Date.now(); return d })
+    .catch(() => _settings || {})
+}
+
+async function showAlert(data) {
+  const cfg = await getSettings()
+  const fs  = (cfg && cfg.follow) ? cfg.follow : {}
+
+  const imgUrl  = (typeof data.imageDataUrl === 'string' && data.imageDataUrl)
+                  ? data.imageDataUrl
+                  : (fs.imageDataUrl || '')
+  const imgSize = Number(data.imageSize || fs.imageSize || 118)
+  const nick  = esc(data.nickname || '새 팔로워')
+  const count = Number(data.followerCount || 0).toLocaleString()
+
   const el = document.createElement('div')
   el.className = 'alert'
-  el.innerHTML = `<div class="alert-icon">❤️</div><div class="alert-body"><div class="alert-title">새 팔로우!</div><div class="alert-sub">팔로워 ${(d.followerCount||0).toLocaleString()}명</div></div>`
-  box.appendChild(el)
-  if ([2,9].includes(theme)) box.querySelectorAll('.alert:not(.out)').forEach((e,i,a)=>{ if(i<a.length-1) dismiss(e) })
-  setTimeout(()=>dismiss(el),5000)
+  if (fontSz > 0) el.style.fontSize = fontSz + 'px'
+
+  if (imgUrl) {
+    const img = document.createElement('img')
+    img.src = imgUrl
+    img.style.cssText = `width:${imgSize}px;height:${imgSize}px;object-fit:contain;display:block;flex-shrink:0;filter:drop-shadow(0 4px 14px rgba(0,0,0,0.7));`
+    el.appendChild(img)
+  } else {
+    const icon = document.createElement('div')
+    icon.className = 'alert-icon'
+    icon.textContent = '❤️'
+    el.appendChild(icon)
+  }
+
+  const body = document.createElement('div')
+  body.className = 'alert-body'
+  body.innerHTML =
+    `<div class="alert-title">${nick}님이 팔로우!</div>` +
+    `<div class="alert-sub">팔로워 ${count}명</div>`
+  el.appendChild(body)
+
+  wrap.appendChild(el)
+
+  if (showMs > 0) setTimeout(() => dismiss(el), showMs)
 }
-function dismiss(el) { if(el.classList.contains('out')) return; el.classList.add('out'); setTimeout(()=>el.remove(),600) }
+
+function dismiss(el) {
+  if (el.classList.contains('out')) return
+  el.classList.add('out')
+  setTimeout(() => el.remove(), 500)
+}
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+}
+
+if (preview) {
+  setTimeout(() => showAlert({ nickname: '새팔로워', followerCount: 1234 }), 300)
+}
 </script>
 </body>
 </html>

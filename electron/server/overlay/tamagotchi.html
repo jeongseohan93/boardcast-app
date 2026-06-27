@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>Tamagotchi Overlay</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background:transparent;
+  overflow:hidden;
+  font-family:'Segoe UI','Malgun Gothic',sans-serif;
+  color:#fff;
+}
+#wrap {
+  position:fixed;
+  right:28px;
+  bottom:28px;
+  width:280px;
+  pointer-events:none;
+  filter:drop-shadow(0 14px 24px #00000080);
+}
+.panel {
+  position:relative;
+  overflow:hidden;
+  border:1px solid #ffffff24;
+  background:linear-gradient(145deg,#12151ee8,#242836e8);
+  border-radius:18px;
+  padding:16px;
+  backdrop-filter:blur(10px);
+}
+.panel::before {
+  content:'';
+  position:absolute;
+  inset:0;
+  background:radial-gradient(circle at 26% 16%,#C8956C22,transparent 34%),radial-gradient(circle at 86% 0%,#EDD9A318,transparent 36%);
+  pointer-events:none;
+}
+.top, .stats, .event { position:relative; z-index:1; }
+.top { display:flex; align-items:center; gap:12px; }
+.pet {
+  width:92px;
+  height:92px;
+  flex-shrink:0;
+  animation:bob 2.4s ease-in-out infinite;
+}
+.meta { min-width:0; flex:1; }
+.label { font-size:11px; color:#EDD9A3; font-weight:800; letter-spacing:.02em; }
+.name { margin-top:3px; font-size:20px; font-weight:900; line-height:1; }
+.sub { margin-top:6px; font-size:12px; color:#ffffffb8; line-height:1.35; }
+.exp { margin-top:11px; height:8px; border-radius:999px; background:#ffffff18; overflow:hidden; border:1px solid #ffffff12; }
+.exp > div { height:100%; width:0; border-radius:999px; background:linear-gradient(90deg,#C8956C,#EDD9A3); transition:width .45s ease; }
+.stats { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-top:12px; }
+.stat { background:#ffffff0e; border:1px solid #ffffff12; border-radius:10px; padding:7px 8px; }
+.stat b { display:block; color:#fff; font-size:13px; }
+.stat span { display:block; color:#ffffff91; font-size:10px; margin-top:2px; }
+.event {
+  min-height:31px;
+  margin-top:10px;
+  padding:8px 10px;
+  border-radius:12px;
+  background:#00000028;
+  border:1px solid #ffffff10;
+  color:#ffffffd8;
+  font-size:12px;
+  line-height:1.25;
+}
+.pop { animation:pop .42s cubic-bezier(.2,1.4,.35,1); }
+
+[data-pet-theme="pixel"] .panel { border-radius:4px; background:linear-gradient(145deg,#0a1f0ae8,#1a3a1ae8); }
+[data-pet-theme="pixel"] .panel::before { background:radial-gradient(circle at 26% 16%,#22c55e22,transparent 34%); }
+[data-pet-theme="slime"] .panel { background:linear-gradient(145deg,#082f49e8,#0c4a6ee8); }
+[data-pet-theme="slime"] .panel::before { background:radial-gradient(circle at 26% 16%,#0ea5e922,transparent 34%); }
+[data-pet-theme="space"] .panel { background:linear-gradient(145deg,#16112be8,#2e1065e8); border-color:#c084fc44; }
+[data-pet-theme="space"] .panel::before { background:radial-gradient(circle at 26% 16%,#a78bfa28,transparent 34%),radial-gradient(circle at 86% 0%,#f0abfc22,transparent 36%); }
+
+@keyframes bob { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+@keyframes pop { 0%{transform:scale(.94)} 70%{transform:scale(1.05)} 100%{transform:scale(1)} }
+@keyframes wag { 0%,100%{transform:rotate(-8deg)} 50%{transform:rotate(9deg)} }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="panel" class="panel">
+    <div class="top">
+      <div id="pet" class="pet">
+        <svg viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg" width="92" height="92" overflow="visible" aria-label="stream mascot">
+          <defs>
+            <radialGradient id="petBody" cx="38%" cy="26%" r="74%">
+              <stop id="petBodyA" offset="0%" stop-color="#D4A272"/>
+              <stop id="petBodyB" offset="100%" stop-color="#9A6840"/>
+            </radialGradient>
+            <radialGradient id="petRuff" cx="48%" cy="22%" r="80%">
+              <stop id="petRuffA" offset="0%" stop-color="#FFFAEE"/>
+              <stop id="petRuffB" offset="100%" stop-color="#EDD9A3"/>
+            </radialGradient>
+            <radialGradient id="petEye" cx="38%" cy="34%" r="70%">
+              <stop id="petEyeA" offset="0%" stop-color="#6B3820"/>
+              <stop id="petEyeB" offset="100%" stop-color="#3D1A08"/>
+            </radialGradient>
+          </defs>
+
+          <g id="tail" style="transform-origin:96px 112px; animation:wag 2.8s ease-in-out infinite">
+            <path d="M106 106 C137 91 140 62 121 51 C109 43 93 51 92 70 C91 88 99 101 106 106Z" fill="url(#petBody)" opacity=".96"/>
+            <path d="M114 94 C132 84 133 66 121 59 C112 54 102 61 103 74 C104 84 109 91 114 94Z" fill="url(#petRuff)" opacity=".92"/>
+          </g>
+
+          <ellipse cx="80" cy="112" rx="34" ry="23" fill="url(#petBody)"/>
+          <ellipse cx="80" cy="93" rx="43" ry="34" fill="url(#petBody)"/>
+          <path d="M47 67 C33 39 34 18 44 12 C56 20 65 40 64 65Z" fill="url(#petBody)"/>
+          <path d="M113 67 C127 39 126 18 116 12 C104 20 95 40 96 65Z" fill="url(#petBody)"/>
+          <path id="earInL" d="M49 60 C42 39 43 25 47 22 C55 31 59 45 58 62Z" fill="#F5B2A0" opacity=".78"/>
+          <path id="earInR" d="M111 60 C118 39 117 25 113 22 C105 31 101 45 102 62Z" fill="#F5B2A0" opacity=".78"/>
+          <circle cx="80" cy="70" r="34" fill="url(#petBody)"/>
+          <path d="M40 95 C47 75 59 66 80 66 C101 66 113 75 120 95 C108 89 99 98 94 113 C88 102 72 102 66 113 C61 98 52 89 40 95Z" fill="url(#petRuff)"/>
+          <circle cx="53" cy="96" r="13" fill="url(#petRuff)"/>
+          <circle cx="67" cy="104" r="14" fill="url(#petRuff)"/>
+          <circle cx="80" cy="107" r="15" fill="url(#petRuff)"/>
+          <circle cx="93" cy="104" r="14" fill="url(#petRuff)"/>
+          <circle cx="107" cy="96" r="13" fill="url(#petRuff)"/>
+          <ellipse cx="64" cy="70" rx="10" ry="12" fill="#120807"/>
+          <ellipse cx="96" cy="70" rx="10" ry="12" fill="#120807"/>
+          <ellipse cx="64" cy="71" rx="7" ry="9" fill="url(#petEye)"/>
+          <ellipse cx="96" cy="71" rx="7" ry="9" fill="url(#petEye)"/>
+          <circle cx="68" cy="65" r="3.2" fill="#fff"/>
+          <circle cx="100" cy="65" r="3.2" fill="#fff"/>
+          <circle cx="61" cy="75" r="1.4" fill="#fff" opacity=".65"/>
+          <circle cx="93" cy="75" r="1.4" fill="#fff" opacity=".65"/>
+          <ellipse cx="80" cy="82" rx="4.6" ry="3.1" fill="#160908"/>
+          <path d="M72 88 Q80 94 88 88" stroke="#160908" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+          <ellipse cx="51" cy="82" rx="8" ry="4.8" fill="#FF7A68" opacity=".22"/>
+          <ellipse cx="109" cy="82" rx="8" ry="4.8" fill="#FF7A68" opacity=".22"/>
+          <ellipse cx="60" cy="132" rx="14" ry="8" fill="url(#petBody)"/>
+          <ellipse cx="100" cy="132" rx="14" ry="8" fill="url(#petBody)"/>
+          <g id="starBits" fill="#FFE8A3" opacity="0">
+            <path d="M127 28 L131 38 L141 42 L131 46 L127 56 L123 46 L113 42 L123 38Z"/>
+            <circle cx="35" cy="40" r="3"/>
+            <circle cx="134" cy="88" r="2.5"/>
+          </g>
+        </svg>
+      </div>
+
+      <div class="meta">
+        <div class="label">STREAM PET</div>
+        <div id="name" class="name">보리</div>
+        <div id="sub" class="sub">Lv.1 알</div>
+        <div class="exp"><div id="exp"></div></div>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><b id="cheese">0</b><span>치즈</span></div>
+      <div class="stat"><b id="follows">0</b><span>팔로우</span></div>
+      <div class="stat"><b id="mood">65</b><span>기분</span></div>
+    </div>
+    <div id="event" class="event">후원과 팔로우를 기다리는 중...</div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket = io()
+const panel = document.getElementById('panel')
+const el = {
+  sub: document.getElementById('sub'),
+  cheese: document.getElementById('cheese'),
+  follows: document.getElementById('follows'),
+  mood: document.getElementById('mood'),
+  event: document.getElementById('event'),
+}
+
+const STAGES = {
+  egg: { label:'알', bodyA:'#EAE0D0', bodyB:'#C8BCA0', ruffA:'#FFFAEE', ruffB:'#F0E8C0', glow:'#EDD9A355', scale:.82, stars:0 },
+  baby: { label:'아기 보리', bodyA:'#D4A272', bodyB:'#9A6840', ruffA:'#FFFAEE', ruffB:'#EDD9A3', glow:'#C8956C66', scale:.92, stars:0 },
+  teen: { label:'복슬 보리', bodyA:'#C89060', bodyB:'#885028', ruffA:'#FFF8E8', ruffB:'#E8CE90', glow:'#D4A27266', scale:1, stars:0 },
+  star: { label:'빛나는 보리', bodyA:'#C4B5FD', bodyB:'#7C3AED', ruffA:'#F5F0FF', ruffB:'#C4B5FD', glow:'#A78BFA88', scale:1, stars:1 },
+}
+
+const THEMES = {
+  classic: null,
+  pixel: { bodyA:'#68B86E', bodyB:'#3A7A40', ruffA:'#E8FFCC', ruffB:'#A3D460', eyeA:'#1E6B20', eyeB:'#0A3A0C', accent:'#9BE076', glow:'#22c55e66' },
+  slime: { bodyA:'#5BA8D4', bodyB:'#2870A8', ruffA:'#D0F0FF', ruffB:'#7DD3F8', eyeA:'#1E7EB8', eyeB:'#0C4A6E', accent:'#8DE5FF', glow:'#0ea5e966' },
+  space: { bodyA:'#C084FC', bodyB:'#7C3AED', ruffA:'#F0E8FF', ruffB:'#C4B5FD', eyeA:'#B44FDC', eyeB:'#6B21A8', accent:'#F0ABFC', glow:'#a78bfa88' },
+}
+
+function setStop(id, color) {
+  const el = document.getElementById(id)
+  if (el) el.setAttribute('stop-color', color)
+}
+
+function fmt(n) {
+  return Number(n || 0).toLocaleString()
+}
+
+function render(state) {
+  const stage = STAGES[state.stage] || STAGES.baby
+  const themeKey = state.theme || 'classic'
+  const theme = themeKey !== 'classic' ? THEMES[themeKey] : null
+
+  const bodyA = theme?.bodyA ?? stage.bodyA
+  const bodyB = theme?.bodyB ?? stage.bodyB
+  const ruffA = theme?.ruffA ?? stage.ruffA
+  const ruffB = theme?.ruffB ?? stage.ruffB
+  const eyeA = theme?.eyeA ?? '#6B3820'
+  const eyeB = theme?.eyeB ?? '#3D1A08'
+  const glow = theme?.glow ?? stage.glow
+  const accent = theme?.accent ?? '#F5B2A0'
+
+  setStop('petBodyA', bodyA)
+  setStop('petBodyB', bodyB)
+  setStop('petRuffA', ruffA)
+  setStop('petRuffB', ruffB)
+  setStop('petEyeA', eyeA)
+  setStop('petEyeB', eyeB)
+  document.getElementById('earInL').setAttribute('fill', accent)
+  document.getElementById('earInR').setAttribute('fill', accent)
+  document.getElementById('starBits').setAttribute('opacity', String(stage.stars))
+  document.getElementById('pet').style.filter = `drop-shadow(0 0 10px ${glow})`
+  document.getElementById('pet').style.transform = `scale(${stage.scale})`
+  document.body.dataset.petTheme = themeKey
+
+  el.sub.textContent = `Lv.${state.level || 1} ${stage.label}`
+  el.cheese.textContent = fmt(state.cheese)
+  el.follows.textContent = fmt(state.follows)
+  el.mood.textContent = Math.round(state.mood || 0)
+
+  const expPct = Math.max(0, Math.min(100, ((state.exp || 0) / (state.expToNext || 1)) * 100))
+  document.getElementById('exp').style.width = expPct + '%'
+
+  if (state.lastEvent?.message) el.event.textContent = state.lastEvent.message
+
+  panel.classList.remove('pop')
+  void panel.offsetWidth
+  panel.classList.add('pop')
+}
+
+fetch('/api/tamagotchi').then(r => r.json()).then(render).catch(() => {})
+socket.on('tamagotchi:update', render)
+</script>
+</body>
+</html>

@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>미션 알림</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:transparent; overflow:hidden; font-family:'Malgun Gothic','Segoe UI',sans-serif; }
+
+#wrap {
+  position:fixed;
+  right:28px;
+  bottom:28px;
+  display:flex;
+  flex-direction:column-reverse;
+  gap:12px;
+  pointer-events:none;
+  z-index:9999;
+  max-width:380px;
+  width:380px;
+}
+
+.mission-card {
+  background:rgba(8,16,24,.96);
+  border:1.5px solid #00FFA3;
+  border-radius:16px;
+  padding:16px 18px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  box-shadow:0 8px 36px rgba(0,0,0,.75), 0 0 20px rgba(0,255,163,.12);
+  animation:slideIn .4s cubic-bezier(.17,.67,.26,1.2) both;
+  position:relative;
+  overflow:hidden;
+}
+.mission-card.waiting {
+  border-color:#facc15;
+  box-shadow:0 8px 36px rgba(0,0,0,.75), 0 0 20px rgba(250,204,21,.14);
+}
+.mission-card.out { animation:slideOut .35s ease forwards !important; }
+.mission-card.success {
+  border-color:#22c55e;
+  box-shadow:0 8px 36px rgba(0,0,0,.75), 0 0 24px rgba(34,197,94,.2);
+}
+.mission-card.failed {
+  border-color:#ef4444;
+  box-shadow:0 8px 36px rgba(0,0,0,.75), 0 0 24px rgba(239,68,68,.15);
+  opacity:.88;
+}
+
+.card-header {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+.badge {
+  display:flex;
+  align-items:center;
+  gap:5px;
+  font-size:11px;
+  font-weight:700;
+  color:#00FFA3;
+  letter-spacing:.03em;
+}
+.mission-card.waiting .badge { color:#facc15; }
+.badge.success { color:#22c55e; }
+.badge.failed  { color:#ef4444; }
+.badge-icon {
+  width:20px; height:20px;
+  display:flex; align-items:center; justify-content:center;
+  border-radius:50%;
+  background:rgba(0,255,163,.15);
+  font-size:11px;
+  flex-shrink:0;
+}
+.mission-card.waiting .badge-icon { background:rgba(250,204,21,.18); }
+.badge.success .badge-icon { background:rgba(34,197,94,.2); }
+.badge.failed  .badge-icon { background:rgba(239,68,68,.18); }
+.donor {
+  font-size:12px;
+  color:rgba(255,255,255,.55);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  max-width:180px;
+}
+
+.mission-text {
+  font-size:17px;
+  font-weight:900;
+  color:#fff;
+  line-height:1.45;
+  word-break:break-word;
+}
+
+.card-footer {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+}
+.amount {
+  font-size:13px;
+  font-weight:700;
+  color:#FFD338;
+}
+.timer {
+  font-size:12px;
+  font-weight:700;
+  color:rgba(255,255,255,.55);
+  font-variant-numeric:tabular-nums;
+  letter-spacing:.03em;
+}
+
+.progress-wrap {
+  height:3px;
+  background:rgba(255,255,255,.08);
+  border-radius:4px;
+  overflow:hidden;
+}
+.progress-bar {
+  height:100%;
+  background:#00FFA3;
+  border-radius:4px;
+  transition:width 1s linear;
+}
+.mission-card.waiting .progress-bar { background:#facc15; }
+.mission-card.success .progress-bar { background:#22c55e; width:100% !important; }
+.mission-card.failed  .progress-bar { background:#ef4444; }
+
+@keyframes slideIn  { from{opacity:0;transform:translateX(40px)} to{opacity:1;transform:none} }
+@keyframes slideOut { to{opacity:0;transform:translateX(50px)} }
+</style>
+</head>
+<body>
+<div id="wrap"></div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const wrap = document.getElementById('wrap')
+const cards = new Map()
+
+const socket = io()
+socket.on('mission', handleMission)
+
+function normalizeStatus(value) {
+  const status = String(value || '').trim().toUpperCase()
+  if (['APPROVE', 'ACCEPTED', 'ACTIVE', 'RUNNING'].includes(status)) return 'APPROVED'
+  if (['SUCCEEDED', 'COMPLETE', 'COMPLETED'].includes(status)) return 'SUCCESS'
+  if (['FAILED', 'FAILURE'].includes(status)) return 'FAIL'
+  if (['CANCELLED', 'CANCELED', 'DENIED'].includes(status)) return 'REJECTED'
+  if (['TIMEOUT', 'TIMED_OUT'].includes(status)) return 'EXPIRED'
+  if (['APPROVED', 'SUCCESS', 'FAIL', 'REJECTED', 'EXPIRED'].includes(status)) return status
+  return 'PENDING'
+}
+
+function statusKind(status, success) {
+  const normalized = normalizeStatus(status)
+  if (normalized === 'SUCCESS') return 'success'
+  if (normalized === 'APPROVED') return 'active'
+  if (normalized === 'PENDING') return 'waiting'
+  return 'failed'
+}
+
+function statusLabel(status, success) {
+  const normalized = normalizeStatus(status)
+  const kind = statusKind(normalized, success)
+  if (kind === 'success') return '미션 성공'
+  if (normalized === 'APPROVED') return '미션 진행'
+  if (normalized === 'REJECTED') return '미션 거절'
+  if (normalized === 'EXPIRED') return '미션 만료'
+  if (kind === 'failed') return '미션 실패'
+  return '미션 대기'
+}
+
+function handleMission(data) {
+  const id = data.missionDonationId
+  if (!id) return
+
+  const status = normalizeStatus(data.status)
+  const kind = statusKind(status, data.success)
+
+  if (cards.has(id)) {
+    updateCard(id, data, status, kind)
+  } else if (kind === 'waiting' || kind === 'active') {
+    createCard(data, status, kind)
+  } else {
+    // 오버레이 리로드 후 success/failed 이벤트 — 카드 생성 후 즉시 전환
+    createCard(data, 'PENDING', 'waiting')
+    setTimeout(() => { if (cards.has(id)) updateCard(id, data, status, kind) }, 80)
+  }
+}
+
+function createCard(data, status, kind) {
+  const id = data.missionDonationId
+  const el = document.createElement('div')
+  el.className = 'mission-card ' + (kind === 'waiting' ? 'waiting' : 'active')
+  el.innerHTML = `
+    <div class="card-header">
+      <div class="badge">
+        <div class="badge-icon">🎯</div>
+        <span class="badge-text">${statusLabel(status, data.success)}</span>
+      </div>
+      <div class="donor">${esc(data.donatorNickname || '시청자')}</div>
+    </div>
+    <div class="mission-text">${esc(data.missionText || '')}</div>
+    <div class="progress-wrap"><div class="progress-bar" style="width:0%"></div></div>
+    <div class="card-footer">
+      <div class="amount">${Number(data.payAmount || 0).toLocaleString()} 치즈</div>
+      <div class="timer">--:--</div>
+    </div>
+  `
+  wrap.prepend(el)
+
+  const entry = { el, tickId: null, endTime: null, totalSec: 0 }
+  cards.set(id, entry)
+  startTimer(id, data)
+}
+
+function updateCard(id, data, status, kind) {
+  const entry = cards.get(id)
+  if (!entry) return
+
+  const { el } = entry
+  const badge = el.querySelector('.badge')
+  const badgeText = el.querySelector('.badge-text')
+  const bar = el.querySelector('.progress-bar')
+  const timer = el.querySelector('.timer')
+
+  el.classList.remove('waiting', 'active', 'success', 'failed')
+  badge.classList.remove('success', 'failed')
+
+  if (kind === 'waiting' || kind === 'active') {
+    el.classList.add(kind === 'waiting' ? 'waiting' : 'active')
+    if (badgeText) badgeText.textContent = statusLabel(status, data.success)
+    startTimer(id, data)
+    return
+  }
+
+  stopTimer(entry)
+
+  if (kind === 'success') {
+    el.classList.add('success')
+    badge.classList.add('success')
+    badge.innerHTML = `<div class="badge-icon">✓</div><span class="badge-text">${statusLabel(status, data.success)}</span>`
+    bar.style.width = '100%'
+    timer.textContent = '성공!'
+  } else {
+    el.classList.add('failed')
+    badge.classList.add('failed')
+    badge.innerHTML = `<div class="badge-icon">×</div><span class="badge-text">${statusLabel(status, data.success)}</span>`
+    timer.textContent = '종료'
+  }
+
+  setTimeout(() => removeCard(id), 5000)
+}
+
+function startTimer(id, data) {
+  const entry = cards.get(id)
+  if (!entry) return
+
+  stopTimer(entry)
+  entry.endTime = data.missionEndTime
+    ? new Date(String(data.missionEndTime).replace(' ', 'T')).getTime()
+    : null
+  entry.totalSec = Number(data.durationTime || 0)
+
+  const bar = entry.el.querySelector('.progress-bar')
+  const timer = entry.el.querySelector('.timer')
+
+  const tick = () => {
+    if (!entry.endTime || !entry.totalSec) {
+      bar.style.width = '0%'
+      timer.textContent = '--:--'
+      return
+    }
+
+    const remaining = Math.max(0, Math.floor((entry.endTime - Date.now()) / 1000))
+    const pct = Math.min(100, Math.max(0, Math.round(((entry.totalSec - remaining) / entry.totalSec) * 100)))
+    bar.style.width = pct + '%'
+    timer.textContent = fmt(remaining)
+    if (remaining <= 0) stopTimer(entry)
+  }
+
+  tick()
+  if (entry.endTime && entry.totalSec) {
+    entry.tickId = setInterval(tick, 1000)
+  }
+}
+
+function stopTimer(entry) {
+  if (entry.tickId) {
+    clearInterval(entry.tickId)
+    entry.tickId = null
+  }
+}
+
+function removeCard(id) {
+  const entry = cards.get(id)
+  if (!entry) return
+  stopTimer(entry)
+  entry.el.classList.add('out')
+  setTimeout(() => {
+    entry.el.remove()
+    cards.delete(id)
+  }, 400)
+}
+
+function fmt(sec) {
+  if (sec <= 0) return '00:00'
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+}
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+}
+
+const p = new URLSearchParams(location.search)
+if (p.get('preview') === '1') {
+  setTimeout(() => {
+    handleMission({
+      missionDonationId: 'preview-1',
+      missionText: '방송 30분 이상 켜두기',
+      status: 'APPROVED',
+      success: false,
+      durationTime: 600,
+      missionEndTime: new Date(Date.now() + 8 * 60 * 1000).toISOString().replace('T', ' ').slice(0, 19),
+      payAmount: 1000,
+      donatorNickname: '테스트유저',
+      donatorChannelId: '',
+    })
+  }, 300)
+}
+</script>
+</body>
+</html>

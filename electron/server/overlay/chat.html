@@ -8,12 +8,18 @@
 body { background:transparent; font-family:'Segoe UI','Malgun Gothic',sans-serif; overflow:hidden; }
 
 /* ── 공통 ── */
-.msg { display:flex; align-items:center; flex-wrap:wrap; gap:4px; }
+.msg { display:flex; align-items:center; flex-wrap:wrap; gap:4px; position:relative; overflow:hidden; }
 .msg.out { pointer-events:none; }
 .badges { display:flex; gap:2px; flex-shrink:0; }
 .badge { font-size:10px; font-weight:800; padding:1px 5px; border-radius:3px; color:#fff; line-height:16px; flex-shrink:0; }
-.nick  { font-weight:700; flex-shrink:0; }
-.text  { word-break:break-all; }
+.badge-img { width:18px; height:18px; object-fit:contain; flex-shrink:0; display:block; }
+.vip-badge { font-size:10px; font-weight:900; padding:1px 6px; border-radius:4px; border:1px solid var(--vip-border); color:var(--vip-text); background:var(--vip-bg); line-height:16px; flex-shrink:0; letter-spacing:0; }
+.msg.vip { border-color:var(--vip-border) !important; box-shadow:0 0 12px var(--vip-glow), inset 0 0 8px var(--vip-soft); }
+.msg.vip .nick { color:var(--vip-text) !important; text-shadow:0 0 8px var(--vip-glow); }
+.msg.vip::after { content:''; position:absolute; inset:0; border-radius:inherit; background:linear-gradient(90deg,var(--vip-soft),transparent 70%); pointer-events:none; opacity:.75; }
+.msg.vip .badges, .msg.vip .nick, .msg.vip .text { position:relative; z-index:1; }
+.nick  { font-weight:700; flex-shrink:0; font-size:16px; }
+.text  { word-break:break-all; font-size:18px; }
 
 /* ── 공통 키프레임 ── */
 @keyframes fi  { from{opacity:0} to{opacity:1} }
@@ -22,73 +28,79 @@ body { background:transparent; font-family:'Segoe UI','Malgun Gothic',sans-serif
 @keyframes sr  { from{opacity:0;transform:translateX(10px)} to{opacity:1;transform:none} }
 @keyframes pop { from{opacity:0;transform:scale(.85)} to{opacity:1;transform:none} }
 
+/* ── 공통: 채팅창 높이 변수 (URL param maxH로 재정의 가능) ── */
+:root { --chat-h: 400px; }
+
+/* ── 공통: 메시지 제거 애니메이션 (fade + height 수축 → 아래 메시지가 부드럽게 내려옴) ── */
+.msg.out {
+  animation: msgOut 0.4s ease forwards !important;
+  overflow: hidden !important;
+}
+@keyframes msgOut {
+  0%   { opacity:1; }
+  35%  { opacity:0; }
+  100% { opacity:0; height:0; min-height:0; padding-top:0; padding-bottom:0; margin-top:0; margin-bottom:0; }
+}
+
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    1. 기본 — 하단 다크 버블 + 뱃지
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-[data-theme="1"] #c { position:fixed;bottom:0;left:0;right:0;max-height:460px;display:flex;flex-direction:column;gap:4px;padding:8px 16px;pointer-events:none; }
-[data-theme="1"] .msg { background:#00000088;backdrop-filter:blur(4px);border-radius:8px;padding:5px 10px;max-width:640px;font-size:14px;animation:sl .2s ease; }
-[data-theme="1"] .msg.out { animation:fo .4s ease forwards; }
+[data-theme="1"] #c { position:fixed;bottom:0;left:0;right:0;max-height:var(--chat-h);display:flex;flex-direction:column;justify-content:flex-end;gap:6px;padding:10px 20px;pointer-events:none;overflow:hidden; }
+[data-theme="1"] .msg { background:#00000099;backdrop-filter:blur(4px);border-radius:10px;padding:7px 14px;max-width:900px;font-size:18px;animation:sl .2s ease;flex-shrink:0; }
 [data-theme="1"] .text { color:#ffffffdd; }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    2. 카카오톡 — 노란 말풍선
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-[data-theme="2"] #c { position:fixed;bottom:0;left:0;right:0;max-height:460px;display:flex;flex-direction:column;gap:6px;padding:8px 14px;pointer-events:none; }
-[data-theme="2"] .msg { background:#FEE500;border-radius:0 14px 14px 14px;padding:7px 12px;max-width:580px;flex-wrap:wrap;align-items:baseline;box-shadow:0 2px 8px #00000040;animation:sl .25s cubic-bezier(.175,.885,.32,1.275); }
-[data-theme="2"] .msg.out { animation:fo .4s ease forwards; }
-[data-theme="2"] .badge { background:#3C1E1E !important;color:#FEE500 !important;font-size:9px; }
-[data-theme="2"] .nick  { color:#3C1E1E;font-size:13px; }
-[data-theme="2"] .text  { color:#1a1a1a;font-size:14px;width:100%;margin-top:2px; }
+[data-theme="2"] #c { position:fixed;bottom:0;left:0;right:0;max-height:var(--chat-h);display:flex;flex-direction:column;justify-content:flex-end;gap:8px;padding:10px 18px;pointer-events:none;overflow:hidden; }
+[data-theme="2"] .msg { background:#FEE500;border-radius:0 14px 14px 14px;padding:9px 14px;max-width:860px;flex-wrap:wrap;align-items:baseline;box-shadow:0 2px 8px #00000040;animation:sl .25s cubic-bezier(.175,.885,.32,1.275);flex-shrink:0; }
+[data-theme="2"] .badge { background:#3C1E1E !important;color:#FEE500 !important;font-size:11px; }
+[data-theme="2"] .nick  { color:#3C1E1E;font-size:16px; }
+[data-theme="2"] .text  { color:#1a1a1a;font-size:18px;width:100%;margin-top:3px; }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    3. 네온 — 닉 컬러 글로우 테두리
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-[data-theme="3"] #c { position:fixed;bottom:0;left:0;right:0;max-height:460px;display:flex;flex-direction:column;gap:5px;padding:8px 16px;pointer-events:none; }
-[data-theme="3"] .msg { background:#0a0b0ff0;border-radius:8px;padding:6px 12px;max-width:640px;font-size:14px;border:1px solid var(--nc);box-shadow:0 0 8px var(--glow),inset 0 0 6px var(--glow);animation:fi .3s ease; }
-[data-theme="3"] .msg.out { animation:fo .4s ease forwards; }
+[data-theme="3"] #c { position:fixed;bottom:0;left:0;right:0;max-height:var(--chat-h);display:flex;flex-direction:column;justify-content:flex-end;gap:7px;padding:10px 20px;pointer-events:none;overflow:hidden; }
+[data-theme="3"] .msg { background:#0a0b0ff0;border-radius:8px;padding:8px 14px;max-width:900px;font-size:18px;border:1px solid var(--nc);box-shadow:0 0 8px var(--glow),inset 0 0 6px var(--glow);animation:fi .3s ease;flex-shrink:0; }
 [data-theme="3"] .text { color:#ffffffcc; }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    4. 박스 — 좌측 컬러 세로 보더
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-[data-theme="4"] #c { position:fixed;bottom:0;left:0;right:0;max-height:460px;display:flex;flex-direction:column;gap:3px;padding:6px 0;pointer-events:none; }
-[data-theme="4"] .msg { background:#141618f0;border-left:3px solid var(--nc);border-radius:0 6px 6px 0;padding:6px 14px;max-width:680px;font-size:14px;animation:sl .2s ease; }
-[data-theme="4"] .msg.out { animation:fo .4s ease forwards; }
+[data-theme="4"] #c { position:fixed;bottom:0;left:0;right:0;max-height:var(--chat-h);display:flex;flex-direction:column;justify-content:flex-end;gap:4px;padding:8px 0;pointer-events:none;overflow:hidden; }
+[data-theme="4"] .msg { background:#141618f0;border-left:4px solid var(--nc);border-radius:0 6px 6px 0;padding:8px 18px;max-width:960px;font-size:18px;animation:sl .2s ease;flex-shrink:0; }
 [data-theme="4"] .text { color:#ffffffcc; }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    5. 무지개 — 메시지별 그라데이션 테두리
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-[data-theme="5"] #c { position:fixed;bottom:0;left:0;right:0;max-height:460px;display:flex;flex-direction:column;gap:5px;padding:8px 16px;pointer-events:none; }
-[data-theme="5"] .msg { background:#1a1c23;border-radius:10px;padding:6px 12px;max-width:640px;font-size:14px;position:relative;animation:sl .25s ease; }
+[data-theme="5"] #c { position:fixed;bottom:0;left:0;right:0;max-height:var(--chat-h);display:flex;flex-direction:column;justify-content:flex-end;gap:7px;padding:10px 20px;pointer-events:none;overflow:hidden; }
+[data-theme="5"] .msg { background:#1a1c23;border-radius:10px;padding:8px 14px;max-width:900px;font-size:18px;position:relative;animation:sl .25s ease;flex-shrink:0; }
 [data-theme="5"] .msg::before { content:'';position:absolute;inset:0;border-radius:10px;background:var(--grad);-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;padding:1.5px;pointer-events:none; }
-[data-theme="5"] .msg.out { animation:fo .4s ease forwards; }
 [data-theme="5"] .text { color:#ffffffcc; }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    6. 라운드 — pill 버블
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-[data-theme="6"] #c { position:fixed;bottom:0;left:0;right:0;max-height:460px;display:flex;flex-direction:column;gap:5px;padding:8px 16px;pointer-events:none; }
-[data-theme="6"] .msg { background:#252830ee;border-radius:30px;padding:6px 16px;max-width:620px;font-size:14px;border:1px solid #ffffff18;animation:sl .25s cubic-bezier(.175,.885,.32,1.275); }
-[data-theme="6"] .msg.out { animation:fo .4s ease forwards; }
+[data-theme="6"] #c { position:fixed;bottom:0;left:0;right:0;max-height:var(--chat-h);display:flex;flex-direction:column;justify-content:flex-end;gap:7px;padding:10px 20px;pointer-events:none;overflow:hidden; }
+[data-theme="6"] .msg { background:#252830ee;border-radius:30px;padding:8px 20px;max-width:880px;font-size:18px;border:1px solid #ffffff18;animation:sl .25s cubic-bezier(.175,.885,.32,1.275);flex-shrink:0; }
 [data-theme="6"] .badge { border-radius:20px; }
 [data-theme="6"] .text { color:#ffffffdd; }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    7. 풍선 — 말풍선 꼬리
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-[data-theme="7"] #c { position:fixed;bottom:0;left:0;right:0;max-height:500px;display:flex;flex-direction:column;gap:8px;padding:8px 24px;pointer-events:none; }
-[data-theme="7"] .msg { background:#1e2230e8;backdrop-filter:blur(6px);border:1px solid #ffffff20;border-radius:4px 14px 14px 14px;padding:7px 13px;max-width:600px;position:relative;margin-left:8px;animation:sl .25s cubic-bezier(.175,.885,.32,1.275); }
+[data-theme="7"] #c { position:fixed;bottom:0;left:0;right:0;max-height:var(--chat-h);display:flex;flex-direction:column;justify-content:flex-end;gap:10px;padding:10px 28px;pointer-events:none;overflow:hidden; }
+[data-theme="7"] .msg { background:#1e2230e8;backdrop-filter:blur(6px);border:1px solid #ffffff20;border-radius:4px 14px 14px 14px;padding:9px 16px;max-width:860px;position:relative;margin-left:8px;font-size:18px;animation:sl .25s cubic-bezier(.175,.885,.32,1.275);flex-shrink:0; }
 [data-theme="7"] .msg::before { content:'';position:absolute;left:-7px;top:8px;width:0;height:0;border-top:7px solid transparent;border-right:8px solid #ffffff20;border-bottom:0; }
-[data-theme="7"] .msg.out { animation:fo .4s ease forwards; }
 [data-theme="7"] .text { color:#ffffffee; }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    8. 레트로 — 터미널 스타일
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-[data-theme="8"] #c { position:fixed;bottom:0;left:0;right:0;max-height:460px;display:flex;flex-direction:column;gap:1px;padding:6px 14px;pointer-events:none;font-family:'Courier New',monospace; }
-[data-theme="8"] .msg { font-size:13px;padding:3px 2px;border-bottom:1px solid #00ff4115;animation:fi .15s ease; }
-[data-theme="8"] .msg.out { animation:fo .3s ease forwards; }
+[data-theme="8"] #c { position:fixed;bottom:0;left:0;right:0;max-height:var(--chat-h);display:flex;flex-direction:column;justify-content:flex-end;gap:2px;padding:8px 18px;pointer-events:none;font-family:'Courier New',monospace;overflow:hidden; }
+[data-theme="8"] .msg { font-size:17px;padding:4px 2px;border-bottom:1px solid #00ff4115;animation:fi .15s ease;flex-shrink:0; }
 [data-theme="8"] .badge { background:none !important;color:var(--nc) !important;padding:0;border-radius:0; }
 [data-theme="8"] .badge::before { content:'['; color:#00ff41; }
 [data-theme="8"] .badge::after  { content:']'; color:#00ff41; }
@@ -98,34 +110,189 @@ body { background:transparent; font-family:'Segoe UI','Malgun Gothic',sans-serif
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    9. 포스트잇 — 스티커 카드
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-[data-theme="9"] #c { position:fixed;bottom:0;left:0;right:0;max-height:500px;display:flex;flex-direction:column;gap:6px;padding:10px 16px;pointer-events:none; }
-[data-theme="9"] .msg { background:#FFF9C4;border-radius:4px 14px 14px 14px;border-top:3px solid var(--nc);padding:8px 12px;max-width:580px;box-shadow:2px 3px 10px #00000050;align-items:baseline;flex-wrap:wrap;animation:pop .3s cubic-bezier(.175,.885,.32,1.275); }
-[data-theme="9"] .msg.out { animation:fo .4s ease forwards; }
+[data-theme="9"] #c { position:fixed;bottom:0;left:0;right:0;max-height:var(--chat-h);display:flex;flex-direction:column;justify-content:flex-end;gap:8px;padding:12px 20px;pointer-events:none;overflow:hidden; }
+[data-theme="9"] .msg { background:#FFF9C4;border-radius:4px 14px 14px 14px;border-top:3px solid var(--nc);padding:10px 14px;max-width:860px;box-shadow:2px 3px 10px #00000050;align-items:baseline;flex-wrap:wrap;animation:pop .3s cubic-bezier(.175,.885,.32,1.275);flex-shrink:0; }
 [data-theme="9"] .badge { color:#fff !important; }
-[data-theme="9"] .nick  { color:#444; }
-[data-theme="9"] .text  { color:#222;width:100%;margin-top:2px; }
+[data-theme="9"] .nick  { color:#444;font-size:16px; }
+[data-theme="9"] .text  { color:#222;font-size:18px;width:100%;margin-top:3px; }
 
 /* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
    10. 게임 HUD — 우측 각진 패널
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
-[data-theme="10"] #c { position:fixed;bottom:0;right:0;width:380px;max-height:500px;display:flex;flex-direction:column;justify-content:flex-end;gap:3px;padding:10px 12px;pointer-events:none; }
-[data-theme="10"] .msg { background:linear-gradient(90deg,#0f1923ee,#1a2432ee);border-top:1px solid #4fc3f720;padding:6px 12px;font-size:13px;clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,0 100%);animation:sr .2s ease; }
-[data-theme="10"] .msg.out { animation:fo .4s ease forwards; }
-[data-theme="10"] .badge { border-radius:2px;font-size:9px; }
-[data-theme="10"] .nick  { font-size:12px; }
-[data-theme="10"] .text  { color:#cfe8ffcc;font-size:13px; }
+[data-theme="10"] #c { position:fixed;bottom:0;right:0;width:520px;max-height:var(--chat-h);display:flex;flex-direction:column;justify-content:flex-end;gap:4px;padding:12px 16px;pointer-events:none;overflow:hidden; }
+[data-theme="10"] .msg { background:linear-gradient(90deg,#0f1923ee,#1a2432ee);border-top:1px solid #4fc3f720;padding:8px 16px;font-size:17px;clip-path:polygon(0 0,calc(100% - 10px) 0,100% 10px,100% 100%,0 100%);animation:sr .2s ease;flex-shrink:0; }
+[data-theme="10"] .badge { border-radius:2px;font-size:11px; }
+[data-theme="10"] .nick  { font-size:15px; }
+[data-theme="10"] .text  { color:#cfe8ffcc;font-size:17px; }
+
+#notice {
+  position:fixed;
+  top:auto;
+  left:50%;
+  bottom:720px;
+  transform:translate(-50%,10px);
+  max-width:min(900px, calc(100vw - 48px));
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:10px 14px;
+  border-radius:12px;
+  background:linear-gradient(135deg,#10131be8,#171b26e8);
+  border:1px solid #00FFA366;
+  box-shadow:0 12px 34px #00000066, 0 0 22px #00FFA326;
+  color:#fff;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .22s ease, transform .22s ease;
+  backdrop-filter:blur(8px);
+  z-index:10;
+}
+#notice.on { opacity:1; transform:translate(-50%,0); }
+#notice .notice-icon {
+  width:28px;
+  height:28px;
+  border-radius:9px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#00FFA3;
+  color:#10131b;
+  font-size:16px;
+  font-weight:900;
+  flex-shrink:0;
+}
+#notice .notice-body { min-width:0; }
+#notice .notice-label {
+  color:#00FFA3;
+  font-size:12px;
+  font-weight:900;
+  margin-bottom:2px;
+}
+#notice .notice-text {
+  color:#ffffffee;
+  font-size:22px;
+  line-height:1.35;
+  font-weight:800;
+  word-break:break-word;
+}
+[data-notice-theme="2"] #notice {
+  background:#fffef8ee;
+  border-color:#facc15aa;
+  box-shadow:0 12px 30px #00000040;
+}
+[data-notice-theme="2"] #notice .notice-icon { background:#facc15; color:#221800; }
+[data-notice-theme="2"] #notice .notice-label { color:#d97706; }
+[data-notice-theme="2"] #notice .notice-text { color:#1f2937; }
+[data-notice-theme="3"] #notice {
+  background:#070912f2;
+  border-color:#f472b6aa;
+  box-shadow:0 0 18px #f472b660, inset 0 0 16px #00ffa314;
+}
+[data-notice-theme="3"] #notice .notice-icon { background:#f472b6; color:#120710; }
+[data-notice-theme="3"] #notice .notice-label { color:#00ffa3; }
+[data-notice-theme="4"] #notice {
+  background:#fee500;
+  border:0;
+  border-radius:0 16px 16px 16px;
+  box-shadow:0 6px 16px #00000040, inset 0 -1px 0 #3c1e1e12;
+  padding:12px 16px;
+  gap:10px;
+}
+[data-notice-theme="4"] #notice::before {
+  content:'';
+  position:absolute;
+  left:-10px;
+  top:0;
+  width:0;
+  height:0;
+  border-top:0 solid transparent;
+  border-right:11px solid #fee500;
+  border-bottom:10px solid transparent;
+}
+[data-notice-theme="4"] #notice .notice-icon {
+  width:25px;
+  height:25px;
+  border-radius:50%;
+  background:#3c1e1e;
+  color:#fee500;
+  font-size:15px;
+}
+[data-notice-theme="4"] #notice .notice-label,
+[data-notice-theme="4"] #notice .notice-text { color:#3c1e1e; }
+[data-notice-theme="4"] #notice .notice-label {
+  font-size:11px;
+  margin-bottom:1px;
+  opacity:.72;
+}
+[data-notice-theme="4"] #notice .notice-text {
+  font-size:20px;
+  font-weight:800;
+}
+[data-notice-theme="5"] #notice {
+  background:linear-gradient(90deg,#0f1923ee,#1a2432ee);
+  border-color:#4fc3f755;
+  border-radius:4px;
+  clip-path:polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,0 100%);
+}
+[data-notice-theme="5"] #notice .notice-icon { background:#4fc3f7; color:#07111a; border-radius:3px; }
+[data-notice-theme="5"] #notice .notice-label { color:#4fc3f7; }
 </style>
 </head>
 <body>
+<div id="notice">
+  <div class="notice-icon">!</div>
+  <div class="notice-body">
+    <div class="notice-label">NOTICE</div>
+    <div class="notice-text"></div>
+  </div>
+</div>
 <div id="c"></div>
 <script src="/socket.io/socket.io.js"></script>
 <script>
-const theme = parseInt(new URLSearchParams(location.search).get('theme') || '1')
+const p         = new URLSearchParams(location.search)
+const theme     = parseInt(p.get('theme')    || '1')
+const MAX       = parseInt(p.get('maxMsgs')  || '12')
+const fadeMs    = parseInt(p.get('fadeMs')   || '0') * 1000
+const fontSz    = parseInt(p.get('fontSize') || '0')
+const maxH      = parseInt(p.get('maxH')     || '400')
+const nickColor = p.get('nickColor') || ''
+const noticeEnabled = p.get('notice') !== '0'
+const noticeTheme = parseInt(p.get('noticeTheme') || '1')
 document.body.dataset.theme = theme
+document.body.dataset.noticeTheme = String(noticeTheme)
+document.documentElement.style.setProperty('--chat-h', maxH + 'px')
+if (fontSz > 0) {
+  const dynStyle = document.createElement('style')
+  dynStyle.textContent = `.nick{font-size:${fontSz - 2}px!important}.text{font-size:${fontSz}px!important}`
+  document.head.appendChild(dynStyle)
+}
 
+const preview = p.get('preview') === '1'
 const socket = io()
 const box    = document.getElementById('c')
-const MAX    = 15
+const noticeBox = document.getElementById('notice')
+const noticeText = noticeBox.querySelector('.notice-text')
+
+fetch('/api/overlay/themes').then(r => r.json()).then(t => {
+  if (t.chat && t.chat !== theme) document.body.dataset.theme = t.chat
+}).catch(() => {})
+socket.on('theme:update', (t) => {
+  if (t.chat) document.body.dataset.theme = t.chat
+  if (noticeBox.classList.contains('on')) requestAnimationFrame(positionNotice)
+})
+window.addEventListener('resize', () => {
+  if (noticeBox.classList.contains('on')) positionNotice()
+})
+
+if (preview) {
+  const samples = [
+    { nickname: '방송인', message: '안녕하세요! 방송 시작합니다 🎉', badges: [], emojis: {} },
+    { nickname: '팬클럽1', message: '오늘도 화이팅이에요~', badges: [], emojis: {} },
+    { nickname: '시청자99', message: '재미있는 방송 감사합니다!', badges: [], emojis: {} },
+  ]
+  samples.forEach((m, i) => setTimeout(() => add(m), 100 + i * 400))
+  setTimeout(() => showNotice({ message: '오늘 공지: 잠시 후 참여 이벤트를 시작합니다.' }), 500)
+}
 
 const COLORS = ['#FF6B9D','#C77DFF','#72EFDD','#F4A261','#90E0EF','#FFD166','#06D6A0','#EF476F','#00FFA3','#FF9500']
 const GRADS  = [
@@ -138,10 +305,17 @@ const GRADS  = [
 ]
 const BADGE_COLOR = { MANAGER:'#FF4444', FAN_CLUB:'#4488FF', STREAMER:'#FFB800', BROADCASTER:'#FFB800', STAFF:'#AA44FF' }
 const BADGE_LABEL = { MANAGER:'M', FAN_CLUB:'F', STREAMER:'BJ', BROADCASTER:'BJ', STAFF:'S' }
+const VIP_TIERS = [
+  { label:'VIP DIAMOND', min:100000, color:'#A5F3FC', bg:'#67E8F91f', border:'#67E8F980', glow:'#67E8F970', soft:'#67E8F91c' },
+  { label:'VIP GOLD',    min:50000,  color:'#FEF08A', bg:'#FACC151f', border:'#FACC1580', glow:'#FACC1570', soft:'#FACC151c' },
+  { label:'VIP SILVER',  min:10000,  color:'#F8FAFC', bg:'#CBD5E11f', border:'#CBD5E180', glow:'#CBD5E170', soft:'#CBD5E11c' },
+  { label:'VIP BRONZE',  min:1000,   color:'#FED7AA', bg:'#FB923C1f', border:'#FB923C80', glow:'#FB923C70', soft:'#FB923C1c' },
+]
 
 const colorMap = {}; let gradIdx = 0
 
 function getColor(nick) {
+  if (nickColor) return nickColor
   if (!colorMap[nick]) {
     let h = 0; for (let i = 0; i < nick.length; i++) h = nick.charCodeAt(i) + ((h << 5) - h)
     colorMap[nick] = COLORS[Math.abs(h) % COLORS.length]
@@ -150,44 +324,165 @@ function getColor(nick) {
 }
 
 function renderBadges(badges) {
-  if (!badges || !badges.length) return ''
-  return badges.map(b => {
-    const t = b.badgeType || b.type || ''
+  const list = normalizeBadgeList(badges)
+  if (!list.length) return ''
+  return list.map(b => {
+    const imageUrl = getBadgeImageUrl(b)
+    const t = getBadgeType(b)
     const c = BADGE_COLOR[t] || '#666888'
-    const l = BADGE_LABEL[t] || (t.charAt(0) || '?').toUpperCase()
+    const l = getBadgeLabel(b)
+    if (imageUrl) return `<img class="badge-img" src="${escAttr(proxyImageUrl(imageUrl))}" alt="${escAttr(l)}" title="${escAttr(l)}">`
     return `<span class="badge" style="background:${c}">${esc(l)}</span>`
   }).join('')
 }
 
+function normalizeBadgeList(value) {
+  const parsed = parseMaybeJSON(value)
+  if (!parsed) return []
+  if (Array.isArray(parsed)) return parsed
+  if (typeof parsed === 'object') {
+    if (Array.isArray(parsed.badges)) return parsed.badges
+    if (parsed.badges) return normalizeBadgeList(parsed.badges)
+    return Object.values(parsed).filter(v => v && typeof v === 'object')
+  }
+  return []
+}
+
+function parseMaybeJSON(value) {
+  if (typeof value !== 'string') return value
+  const text = value.trim()
+  if (!text) return value
+  if (!((text.startsWith('{') && text.endsWith('}')) || (text.startsWith('[') && text.endsWith(']')))) return value
+  try { return JSON.parse(text) } catch { return value }
+}
+
+function getBadgeImageUrl(b) {
+  return findBadgeImageUrl(b, 0)
+}
+
+function findBadgeImageUrl(value, depth) {
+  if (depth > 4 || value == null) return ''
+  if (typeof value === 'string') {
+    const text = value.trim()
+    if (/^https?:\/\//i.test(text)) return text
+    if ((text.startsWith('{') && text.endsWith('}')) || (text.startsWith('[') && text.endsWith(']'))) {
+      try { return findBadgeImageUrl(JSON.parse(text), depth + 1) } catch { return '' }
+    }
+    return ''
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findBadgeImageUrl(item, depth + 1)
+      if (found) return found
+    }
+    return ''
+  }
+  if (typeof value !== 'object') return ''
+
+  const entries = Object.entries(value)
+  const priority = entries.filter(([key]) => /image|icon|url|badge/i.test(key))
+  for (const [, nested] of priority) {
+    const found = findBadgeImageUrl(nested, depth + 1)
+    if (found) return found
+  }
+  for (const [, nested] of entries) {
+    const found = findBadgeImageUrl(nested, depth + 1)
+    if (found) return found
+  }
+  return ''
+}
+
+function getBadgeLabel(b) {
+  if (!b || typeof b !== 'object') return '?'
+  const t = getBadgeType(b)
+  return BADGE_LABEL[t] || b.badgeName || b.name || b.label || b.title || (t.charAt(0) || '?')
+}
+
+function getBadgeType(b) {
+  if (!b || typeof b !== 'object') return ''
+  return String(b.badgeType || b.type || b.code || b.badgeCode || '').toUpperCase()
+}
+
+function proxyImageUrl(url) {
+  return `/api/proxy/image?url=${encodeURIComponent(url)}`
+}
+
+function getVipTier(total) {
+  const cheese = Number(total || 0)
+  return VIP_TIERS.find(t => cheese >= t.min) || null
+}
+
 socket.on('chat', add)
+socket.on('notice', showNotice)
+
+function showNotice(d) {
+  if (!noticeEnabled || !d?.message) return
+  noticeText.innerHTML = renderMsg(d.message, d.emojis)
+  positionNotice()
+  noticeBox.classList.add('on')
+}
+
+function positionNotice() {
+  const rect = box.getBoundingClientRect()
+  const visibleMessages = [...box.querySelectorAll('.msg:not(.out)')]
+  const lastMsg = visibleMessages[visibleMessages.length - 1]
+  const msgRect = lastMsg ? lastMsg.getBoundingClientRect() : null
+  const gap = 10
+  const left = msgRect ? msgRect.left + msgRect.width / 2 : rect.left + rect.width / 2
+  const targetWidth = msgRect ? msgRect.width : Math.min(rect.width, 520)
+  const width = Math.max(300, Math.min(targetWidth, 720, window.innerWidth - 48))
+  noticeBox.style.left = `${left}px`
+  noticeBox.style.bottom = `${Math.max(16, window.innerHeight - rect.top + gap)}px`
+  noticeBox.style.width = `${width}px`
+  noticeBox.style.maxWidth = `${width}px`
+}
 
 function add(d) {
   const nc   = getColor(d.nickname)
+  const vip  = getVipTier(d.donationTotal)
   const grad = GRADS[gradIdx++ % GRADS.length]
   const el   = document.createElement('div')
-  el.className = 'msg'
+  el.className = vip ? 'msg vip' : 'msg'
   el.style.setProperty('--nc',   nc)
   el.style.setProperty('--glow', nc + '50')
   el.style.setProperty('--grad', grad)
+  if (vip) {
+    el.style.setProperty('--vip-text', vip.color)
+    el.style.setProperty('--vip-bg', vip.bg)
+    el.style.setProperty('--vip-border', vip.border)
+    el.style.setProperty('--vip-glow', vip.glow)
+    el.style.setProperty('--vip-soft', vip.soft)
+  }
   el.innerHTML = `
-    <div class="badges">${renderBadges(d.badges)}</div>
-    <span class="nick" style="color:${nc}">${esc(d.nickname)}</span>
+    <div class="badges">${vip ? `<span class="vip-badge">${esc(vip.label)}</span>` : ''}${renderBadges(d.badges)}</div>
+    <span class="nick" style="color:${vip ? vip.color : nc}">${esc(d.nickname)}</span>
     <span class="text">${renderMsg(d.message, d.emojis)}</span>
   `
   box.appendChild(el)
+  if (noticeBox.classList.contains('on')) positionNotice()
+  if (fadeMs > 0) setTimeout(() => dismissMsg(el), fadeMs)
   const all = box.querySelectorAll('.msg:not(.out)')
-  if (all.length > MAX) { all[0].classList.add('out'); setTimeout(() => all[0].remove(), 400) }
+  if (all.length > MAX) dismissMsg(all[0])
+}
+
+function dismissMsg(el) {
+  if (!el || el.classList.contains('out')) return
+  // 현재 높이를 고정해서 CSS 애니메이션이 height: 0까지 부드럽게 수축하도록
+  el.style.height = el.offsetHeight + 'px'
+  el.classList.add('out')
+  setTimeout(() => el.remove(), 450)
 }
 
 function renderMsg(t, e) {
   if (!t) return ''
   return esc(t).replace(/\{:([^:]+):\}/g, (_, k) => {
     const u = (e || {})[k]
-    return u ? `<img src="${u}" height="20" style="vertical-align:middle;margin:0 1px">` : `{:${k}:}`
+    return u ? `<img src="${escAttr(String(u))}" height="24" width="24" style="vertical-align:middle;margin:0 1px;object-fit:contain">` : `{:${k}:}`
   })
 }
 
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+function escAttr(s) { return esc(s).replace(/'/g,'&#39;') }
 </script>
 </body>
 </html>

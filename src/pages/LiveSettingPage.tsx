@@ -76,7 +76,7 @@ export default function LiveSettingPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-bg-outer overflow-hidden">
+    <div className="flex flex-col h-full bg-bg-outer overflow-hidden">
       {/* 헤더 */}
       <div className="flex items-center gap-3 px-5 py-4 border-b border-border shrink-0">
         <Radio size={18} className="text-accent-mint" />

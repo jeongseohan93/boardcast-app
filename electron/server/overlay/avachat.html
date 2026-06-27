@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>아바타 채팅</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body {
+  width:100vw;
+  height:100vh;
+  overflow:hidden;
+  background:transparent;
+  pointer-events:none;
+  font-family:'Malgun Gothic','Segoe UI',sans-serif;
+}
+.av-wrap {
+  position:fixed;
+  bottom:0;
+  left:0;
+  filter:drop-shadow(0 6px 8px rgba(0,0,0,.28));
+}
+.av-img {
+  display:block;
+  object-fit:contain;
+  transform-origin:center bottom;
+}
+.av-placeholder {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-radius:22px;
+  color:#111827;
+  font-weight:900;
+  background:linear-gradient(135deg,#fff,#a7f3d0);
+  border:2px solid rgba(255,255,255,.85);
+}
+.av-bubble {
+  position:absolute;
+  bottom:calc(100% + 10px);
+  left:50%;
+  transform:translateX(-50%);
+  max-width:260px;
+  padding:9px 14px;
+  border-radius:16px;
+  background:rgba(255,255,255,.97);
+  color:#222;
+  line-height:1.5;
+  word-break:keep-all;
+  white-space:normal;
+  box-shadow:0 6px 20px rgba(0,0,0,.3), 0 2px 6px rgba(0,0,0,.2);
+  animation:bIn .28s cubic-bezier(.17,.67,.26,1.3) both;
+}
+.av-bubble::after {
+  content:'';
+  position:absolute;
+  top:100%;
+  left:50%;
+  transform:translateX(-50%);
+  border:10px solid transparent;
+  border-top-color:rgba(255,255,255,.97);
+}
+.av-bubble.out { animation:bOut .2s ease forwards; }
+.av-nick { font-weight:900; font-size:13px; margin-bottom:3px; }
+.av-msg { font-size:14px; color:#333; }
+@keyframes bIn { from { opacity:0; transform:translateX(-50%) scale(.82) translateY(8px); } to { opacity:1; transform:translateX(-50%) scale(1) translateY(0); } }
+@keyframes bOut { to { opacity:0; transform:translateX(-50%) scale(.9) translateY(-6px); } }
+</style>
+</head>
+<body>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const params = new URLSearchParams(location.search)
+const preview = params.get('preview') === '1'
+const paramSize = parseInt(params.get('size') || '0')
+const NICK_COLORS = ['#FF6B9D','#C77DFF','#72EFDD','#F4A261','#60A5FA','#FFD166','#06D6A0']
+const nickColors = {}
+const avatarByNick = {}
+const MAX_AVATARS = 30
+
+let avSize = 100
+let avatarSources = []
+let avatars = []
+let raf = null
+let lastT = null
+
+function nickColor(nick) {
+  if (!nickColors[nick]) nickColors[nick] = NICK_COLORS[Math.abs(hashText(nick)) % NICK_COLORS.length]
+  return nickColors[nick]
+}
+
+async function init() {
+  const cfg = await fetch('/api/overlay/settings').then(r => r.ok ? r.json() : {}).catch(() => ({}))
+  const ac = cfg && cfg.avachat ? cfg.avachat : {}
+  avSize = paramSize > 0
+    ? Math.max(60, Math.min(200, paramSize))
+    : Math.max(60, Math.min(200, Number(ac.size || 100)))
+  const images = Array.isArray(ac.images) ? ac.images.filter(Boolean) : []
+  avatarSources = images.length ? images : (preview ? ['ph0','ph1','ph2','ph3','ph4'] : [])
+  if (!avatarSources.length) return
+  startLoop()
+
+  if (preview) {
+    setTimeout(() => onChat({ nickname:'테스트유저', message:'채팅을 치면 제 아바타가 생겨요.' }), 700)
+    setTimeout(() => onChat({ nickname:'치즈러버', message:'저도 입장했습니다!' }), 2200)
+    setTimeout(() => onChat({ nickname:'테스트유저', message:'같은 닉네임은 같은 아바타가 말합니다.' }), 4200)
+  }
+}
+
+function getOrCreateAvatar(nick) {
+  if (avatarByNick[nick]) {
+    avatarByNick[nick].lastSeen = Date.now()
+    return avatarByNick[nick]
+  }
+  if (!avatarSources.length) return null
+  if (avatars.length >= MAX_AVATARS) removeAvatar([...avatars].sort((a, b) => a.lastSeen - b.lastSeen)[0])
+  const src = avatarSources[Math.abs(hashText(nick)) % avatarSources.length]
+  return spawnAvatar(src, nick)
+}
+
+function spawnAvatar(src, nick) {
+  const wrap = document.createElement('div')
+  wrap.className = 'av-wrap'
+  wrap.style.willChange = 'left, bottom'
+
+  let imgEl
+  if (String(src).startsWith('ph')) {
+    imgEl = document.createElement('div')
+    imgEl.className = 'av-img av-placeholder'
+    imgEl.style.width = `${avSize}px`
+    imgEl.style.height = `${avSize}px`
+    imgEl.style.fontSize = `${Math.round(avSize * 0.36)}px`
+    imgEl.textContent = nick.slice(0, 2).toUpperCase()
+  } else {
+    imgEl = document.createElement('img')
+    imgEl.className = 'av-img'
+    imgEl.src = src
+    imgEl.width = avSize
+    imgEl.height = avSize
+    imgEl.style.width = `${avSize}px`
+    imgEl.style.height = `${avSize}px`
+  }
+
+  wrap.appendChild(imgEl)
+  document.body.appendChild(wrap)
+
+  const av = {
+    el: wrap,
+    imgEl,
+    nick,
+    x: Math.max(avSize, Math.min(window.innerWidth - avSize, Math.random() * window.innerWidth)),
+    dir: Math.random() > 0.5 ? 1 : -1,
+    speed: 45 + Math.random() * 60,
+    phase: Math.random() * Math.PI * 2,
+    talking: false,
+    bubble: null,
+    lastSeen: Date.now(),
+  }
+  avatars.push(av)
+  avatarByNick[nick] = av
+  startLoop()
+  return av
+}
+
+function removeAvatar(av) {
+  if (!av) return
+  if (av.nick && avatarByNick[av.nick] === av) delete avatarByNick[av.nick]
+  avatars = avatars.filter(item => item !== av)
+  av.el.remove()
+}
+
+function startLoop() {
+  if (raf) return
+  lastT = null
+  raf = requestAnimationFrame(tick)
+}
+
+function tick(now) {
+  if (!lastT) lastT = now
+  const dt = Math.min((now - lastT) / 1000, 0.05)
+  lastT = now
+  const W = window.innerWidth
+  const margin = avSize * 0.5 + 12
+
+  for (const av of avatars) {
+    av.phase += dt * (av.talking ? 4 : 8)
+    const bob = Math.abs(Math.sin(av.phase)) * (av.talking ? 3 : 7)
+    if (!av.talking) {
+      av.x += av.speed * av.dir * dt
+      if (av.x < margin) { av.x = margin; av.dir = 1 }
+      if (av.x > W - margin) { av.x = W - margin; av.dir = -1 }
+    }
+    av.el.style.left = `${av.x - avSize / 2}px`
+    av.el.style.bottom = `${bob}px`
+    av.imgEl.style.transform = av.dir === -1 ? 'scaleX(-1)' : 'scaleX(1)'
+  }
+  if (avatars.length > 0) {
+    raf = requestAnimationFrame(tick)
+  } else {
+    raf = null
+  }
+}
+
+function onChat(data) {
+  const rawNick = String(data && data.nickname ? data.nickname : '시청자').slice(0, 20)
+  const rawMsg = String(data && data.message ? data.message : '').slice(0, 70)
+  if (!rawMsg.trim()) return
+  const av = getOrCreateAvatar(rawNick)
+  if (!av) return
+  av.lastSeen = Date.now()
+
+  if (av.bubble) {
+    av.bubble.remove()
+    av.bubble = null
+  }
+
+  const bubble = document.createElement('div')
+  bubble.className = 'av-bubble'
+  bubble.innerHTML =
+    `<div class="av-nick" style="color:${nickColor(rawNick)}">${esc(rawNick)}</div>` +
+    `<div class="av-msg">${esc(rawMsg)}</div>`
+  av.el.appendChild(bubble)
+  av.bubble = bubble
+  av.talking = true
+
+  setTimeout(() => {
+    if (!av.el.contains(bubble)) return
+    bubble.classList.add('out')
+    setTimeout(() => {
+      bubble.remove()
+      if (av.bubble === bubble) {
+        av.bubble = null
+        av.talking = false
+      }
+    }, 220)
+  }, 5000)
+}
+
+function hashText(text) {
+  let h = 0
+  for (let i = 0; i < text.length; i++) h = text.charCodeAt(i) + ((h << 5) - h)
+  return h
+}
+
+function esc(value) {
+  return String(value)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+}
+
+init()
+const socket = io()
+socket.on('chat', onChat)
+</script>
+</body>
+</html>

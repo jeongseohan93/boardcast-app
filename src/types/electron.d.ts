@@ -21,6 +21,11 @@ declare global {
       getVersion: () => Promise<string>
       getServerPort: () => Promise<number>
       addFirewallRule: () => Promise<{ ok: boolean; error?: string }>
+      windowMinimize: () => Promise<void>
+      windowMaximize: () => Promise<void>
+      windowClose: () => Promise<void>
+      windowIsMaximized: () => Promise<boolean>
+      onWindowMaximizeChange: (callback: (maximized: boolean) => void) => void
     }
   }
 }

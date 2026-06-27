@@ -33,7 +33,7 @@ function createWindow() {
     minWidth: 1100,
     minHeight: 680,
     backgroundColor: '#17191D', // 로딩 전 깜빡임 방지용 기본 배경색
-    titleBarStyle: 'default',
+    frame: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'), // contextBridge 설정 스크립트
       contextIsolation: true,  // 렌더러와 Node.js 컨텍스트 분리 (보안)
@@ -52,6 +52,9 @@ function createWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null
   })
+
+  mainWindow.on('maximize', () => mainWindow?.webContents.send('window-maximized', true))
+  mainWindow.on('unmaximize', () => mainWindow?.webContents.send('window-maximized', false))
 }
 
 // ─── 서버 시작 ────────────────────────────────────────────────────────────────
@@ -131,8 +134,10 @@ ipcMain.handle('open-oauth-window', async (_event, url: string) => {
   })
 })
 
-// 외부 브라우저로 URL 열기 (시스템 기본 브라우저 사용)
+
+// 외부 브라우저로 URL 열기 — http/https 프로토콜만 허용
 ipcMain.handle('open-external', (_event, url: string) => {
+  if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) return
   shell.openExternal(url)
 })
 
@@ -179,8 +184,10 @@ ipcMain.handle('secure-store-delete', (_event, key: string) => {
   store.delete(`secure_${key}_plain` as never)
 })
 
-// electron-store 일반 값 (암호화 불필요한 설정: 방송 제목 히스토리, channelId 등)
+// electron-store 일반 값 — 렌더러가 쓸 수 있는 키를 명시적으로 허용
+const ALLOWED_STORE_KEYS = new Set(['overlayThemes', 'overlaySettings', 'sidebarExpanded', 'appTheme'])
 ipcMain.handle('store-set', (_event, key: string, value: unknown) => {
+  if (!ALLOWED_STORE_KEYS.has(key)) return
   store.set(key, value)
 })
 
@@ -197,6 +204,15 @@ ipcMain.handle('get-version', () => app.getVersion())
 
 // Express 서버 포트 (렌더러의 Axios가 올바른 포트로 요청하도록)
 ipcMain.handle('get-server-port', () => SERVER_PORT)
+
+// 커스텀 타이틀바 창 컨트롤
+ipcMain.handle('window-minimize', () => mainWindow?.minimize())
+ipcMain.handle('window-maximize', () => {
+  if (mainWindow?.isMaximized()) mainWindow.unmaximize()
+  else mainWindow?.maximize()
+})
+ipcMain.handle('window-close', () => mainWindow?.close())
+ipcMain.handle('window-is-maximized', () => mainWindow?.isMaximized() ?? false)
 
 // Windows 방화벽에 3001 포트 인바운드 허용 규칙 추가
 // 송출컴(다른 PC)에서 오버레이에 접근할 수 있도록

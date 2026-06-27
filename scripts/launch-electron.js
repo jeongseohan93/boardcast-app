@@ -26,6 +26,18 @@ if (fs.existsSync(srcOverlay)) {
   console.log('[launch] Copied overlay HTML files to dist-electron/server/overlay/')
 }
 
+// 룰렛 테마 이미지를 dist-electron/server/overlay/roulette-themes/ 로 복사
+const srcThemes = path.join(__dirname, '..', 'public', '룰렛')
+const dstThemes = path.join(dstOverlay, 'roulette-themes')
+
+if (fs.existsSync(srcThemes)) {
+  fs.mkdirSync(dstThemes, { recursive: true })
+  for (const file of fs.readdirSync(srcThemes)) {
+    fs.copyFileSync(path.join(srcThemes, file), path.join(dstThemes, file))
+  }
+  console.log('[launch] Copied roulette theme images to dist-electron/server/overlay/roulette-themes/')
+}
+
 const env = { ...process.env }
 delete env.ELECTRON_RUN_AS_NODE  // 완전히 제거
 

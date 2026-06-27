@@ -5,48 +5,230 @@ const SocketIOClient = require('socket.io-client-v2') as (url: string, opts?: Re
   disconnect: () => void
 }
 
+type SocketIOClientSocket = ReturnType<typeof SocketIOClient>
+type DebuggableSocket = SocketIOClientSocket & {
+  onevent?: (packet: { data?: unknown }) => void
+}
+
 import { Server as SocketIOServer } from 'socket.io'
 import axios from 'axios'
 import { getDB } from '../db/index'
-import { getSessionAuth, sendChat } from './chzzkApi'
-import { findMatchingCommand } from './botService'
-import { getRoulettConfig } from '../routes/roulette'
+import { getSessionAuth } from './chzzkApi'
+import { getRoulettes } from '../routes/roulette'
+import { applyTamagotchiDonation } from './tamagotchiService'
+import { addVideoDonation, getVideoDonationConfig, getVideoDonationQueue, isCurrentlyPlaying, playVideoDonation } from './videoDonationService'
+import { recordRawDonationEvent, recordRawSessionEvent } from './rawEventDebugService'
+import { ChzzkInternalChat } from './chzzkInternalChat'
+import { saveMissionToDB } from '../routes/mission'
+
+function parseMaybeJSON(value: unknown): unknown {
+  if (typeof value !== 'string') return value
+  const text = value.trim()
+  if (!text) return value
+  if (!((text.startsWith('{') && text.endsWith('}')) || (text.startsWith('[') && text.endsWith(']')))) return value
+  try {
+    return JSON.parse(text) as unknown
+  } catch {
+    return value
+  }
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  const parsed = parseMaybeJSON(value)
+  return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {}
+}
+
+function normalizeBadges(value: unknown): unknown[] {
+  const parsed = parseMaybeJSON(value)
+  if (Array.isArray(parsed)) return parsed
+  if (parsed && typeof parsed === 'object') return Object.values(parsed as Record<string, unknown>)
+  return []
+}
+
+function collectProfileBadges(profile: Record<string, unknown>): unknown[] {
+  const candidates = [
+    profile.badges,
+    profile.badge,
+    profile.activityBadges,
+    profile.profileBadges,
+    profile.subscriptionBadge,
+    profile.streamingBadge,
+  ]
+
+  const badges = candidates.flatMap(normalizeBadges)
+  if (badges.length) return badges
+
+  return Object.entries(profile)
+    .filter(([key]) => /badge/i.test(key))
+    .flatMap(([, value]) => normalizeBadges(value))
+}
+
+function findImageUrl(value: unknown, depth = 0): string {
+  const parsed = parseMaybeJSON(value)
+  if (depth > 5 || parsed == null) return ''
+  if (typeof parsed === 'string') return /^https?:\/\//i.test(parsed) ? parsed : ''
+  if (Array.isArray(parsed)) {
+    for (const item of parsed) {
+      const found = findImageUrl(item, depth + 1)
+      if (found) return found
+    }
+    return ''
+  }
+  if (typeof parsed !== 'object') return ''
+
+  const entries = Object.entries(parsed as Record<string, unknown>)
+  const priority = entries.filter(([key]) => /url|image|icon|emote|emoji/i.test(key))
+  for (const [, nested] of priority) {
+    const found = findImageUrl(nested, depth + 1)
+    if (found) return found
+  }
+  for (const [, nested] of entries) {
+    const found = findImageUrl(nested, depth + 1)
+    if (found) return found
+  }
+  return ''
+}
+
+function normalizeEmojis(value: unknown): Record<string, string> {
+  const parsed = parseMaybeJSON(value)
+  if (!parsed || typeof parsed !== 'object') return {}
+
+  const entries = Array.isArray(parsed)
+    ? parsed.map((item, index) => [String(index), item] as const)
+    : Object.entries(parsed as Record<string, unknown>)
+
+  return entries.reduce<Record<string, string>>((acc, [key, item]) => {
+    const url = findImageUrl(item)
+    if (url) acc[key] = url
+    return acc
+  }, {})
+}
+
+function emojiItemsFromMap(emojis: Record<string, string>) {
+  return Object.entries(emojis).map(([key, url]) => ({ key, url }))
+}
 
 export class ChzzkSession {
-  private socket: ReturnType<typeof SocketIOClient> | null = null
+  private socket: DebuggableSocket | null = null
   private sessionKey: string | null = null
   private accessToken: string
   private channelId: string
   private clientId: string
-  private clientSecret: string
   private io: SocketIOServer
   private destroyed = false
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private tokenRefresher: (() => Promise<string | null>) | null = null
   private refreshAttempted = false
   private chatChannelId: string | null = null
+  private internalChat: ChzzkInternalChat | null = null
+
+  getChatChannelId(): string | null {
+    return this.chatChannelId
+  }
 
   constructor(
     accessToken: string,
     channelId: string,
     clientId: string,
-    clientSecret: string,
+    _clientSecret: string,
     io: SocketIOServer,
     tokenRefresher?: () => Promise<string | null>,
   ) {
     this.accessToken = accessToken
     this.channelId = channelId
     this.clientId = clientId
-    this.clientSecret = clientSecret
     this.io = io
     this.tokenRefresher = tokenRefresher ?? null
   }
 
+  private getDonationTotal(userId?: string, nickname?: string): number {
+    const db = getDB()
+    const row = db.prepare(
+      `SELECT COALESCE(SUM(amount), 0) as total
+       FROM donations
+       WHERE channel_id = ?
+         AND (
+           (? != '' AND user_id = ?)
+           OR (? != '' AND nickname = ?)
+         )`
+    ).get(
+      this.channelId,
+      userId || '',
+      userId || '',
+      nickname || '',
+      nickname || ''
+    ) as { total: number }
+
+    return row.total
+  }
+
+  private shouldRecordRawSessionEvent(eventName: string): boolean {
+    return eventName !== 'CHAT'
+  }
+
+  private captureRawSessionEvent(eventName: string, args: unknown[]) {
+    if (!this.shouldRecordRawSessionEvent(eventName)) return
+
+    try {
+      const debugEntry = recordRawSessionEvent({
+        eventName,
+        args,
+        channelId: this.channelId,
+      })
+
+      console.log('[ChzzkSession] session raw captured:', {
+        id: debugEntry.id,
+        eventName: debugEntry.eventName,
+        keys: debugEntry.keys,
+        systemType: debugEntry.systemType,
+        eventType: debugEntry.eventType,
+        dataType: debugEntry.dataType,
+        donationType: debugEntry.donationType,
+        status: debugEntry.status,
+        kind: debugEntry.kind,
+        missionHints: debugEntry.missionHints,
+      })
+      this.io.emit('debug:sessionRaw', debugEntry)
+    } catch (err) {
+      console.error('[ChzzkSession] session raw capture failed:', err)
+    }
+  }
+
+  private attachRawSessionDebug(socket: DebuggableSocket) {
+    const originalOnevent = typeof socket.onevent === 'function'
+      ? socket.onevent.bind(socket)
+      : null
+
+    if (originalOnevent) {
+      socket.onevent = (packet: { data?: unknown }) => {
+        const packetData = Array.isArray(packet?.data) ? packet.data : []
+        const [eventName, ...args] = packetData
+
+        if (typeof eventName === 'string') {
+          this.captureRawSessionEvent(eventName, args)
+        } else {
+          this.captureRawSessionEvent('UNKNOWN', packetData)
+        }
+
+        originalOnevent(packet)
+      }
+      return
+    }
+
+    for (const eventName of ['SYSTEM', 'DONATION', 'SUBSCRIPTION', 'MISSION', 'MISSION_PARTICIPATION']) {
+      socket.on(eventName, (raw: unknown) => this.captureRawSessionEvent(eventName, [raw]))
+    }
+  }
+
   async connect() {
     this.refreshAttempted = false  // 매 연결 시도마다 초기화
+    if (this.socket) {
+      this.socket.disconnect()
+      this.socket = null
+    }
     try {
       console.log('[ChzzkSession] connect() called - fetching user session auth...')
-      const sessionData = await getSessionAuth(this.accessToken, this.clientId)
+      const sessionData = await getSessionAuth(this.accessToken)
       console.log('[ChzzkSession] Session auth response:', JSON.stringify(sessionData))
       const { url } = sessionData
 
@@ -63,6 +245,7 @@ export class ChzzkSession {
         'connect timeout': 3000,
         transports: ['websocket'],
       })
+      this.attachRawSessionDebug(this.socket)
 
       this.socket.on('connect', () => {
         console.log('[ChzzkSession] WebSocket connected - waiting for SYSTEM connected message')
@@ -87,43 +270,70 @@ export class ChzzkSession {
 
       this.socket.on('CHAT', (raw: unknown) => {
         const data = parse<ChzzkChatEvent>(raw)
+        const profile = asRecord(data.profile)
+        const badges = collectProfileBadges(profile)
+        const userId = data.senderChannelId || ''
+        const nickname = typeof profile.nickname === 'string' ? profile.nickname : 'unknown'
+        const msg = (data.content || '').trim()
+        const emojis = normalizeEmojis(data.emojis)
 
         if (data.chatChannelId && !this.chatChannelId) {
           this.chatChannelId = data.chatChannelId
           console.log('[ChzzkSession] chatChannelId captured:', this.chatChannelId)
+          this.startInternalChat(this.chatChannelId)
         }
 
         this.io.emit('chat', {
           type: 'CHAT',
-          userId: data.senderChannelId || '',
-          nickname: data.profile?.nickname || 'unknown',
+          userId,
+          chatChannelId: data.chatChannelId,
+          messageTime: data.messageTime,
+          senderChannelId: data.senderChannelId,
+          nickname,
           message: data.content,
-          emojis: data.emojis || {},
-          badges: data.profile?.badges || [],
+          donationTotal: this.getDonationTotal(userId, nickname),
+          emojis,
+          emojiItems: emojiItemsFromMap(emojis),
+          badges,
           timestamp: data.messageTime
             ? new Date(data.messageTime).toISOString()
             : new Date().toISOString(),
         })
 
-        const msg = data.content?.trim()
-        if (msg) {
-          const cmd = findMatchingCommand(msg, data.userRoleCode)
-          if (cmd) {
-            void (async () => {
-              try {
-                await sendChat(this.accessToken, cmd.response, this.clientId)
-              } catch (err: unknown) {
-                const detail = axios.isAxiosError(err) ? err.response?.data ?? err.message : err instanceof Error ? err.message : String(err)
-                console.error('[Bot] Send failed:', JSON.stringify(detail))
-                this.io.emit('bot-send-error', { trigger: cmd.trigger, detail })
-              }
-            })()
+        // ── 투표 커맨드 처리 ─────────────────────────────────────────────────────
+        const { startPoll, stopPoll, vote, isActive, getVoteState } = require('./votingService')
+
+        if (msg === '!투표종료') {
+          const state = stopPoll()
+          this.io.emit('pollUpdate', state)
+        } else if (msg.startsWith('!투표')) {
+          const rest = msg.slice(3).trim()
+          if (rest) {
+            const parts = rest.split('/').map((s: string) => s.trim()).filter(Boolean)
+            if (parts.length >= 3) {
+              const [title, ...options] = parts
+              const state = startPoll(title, options)
+              this.io.emit('pollUpdate', state)
+            }
           }
+        } else if (isActive() && /^[1-9]$/.test(msg)) {
+          const changed = vote(userId, parseInt(msg, 10))
+          if (changed) this.io.emit('pollUpdate', getVoteState())
         }
+
       })
 
       this.socket.on('DONATION', (raw: unknown) => {
         const data = parse<ChzzkDonationEvent>(raw)
+        const debugEntry = recordRawDonationEvent({ raw, parsed: data, channelId: this.channelId })
+        console.log('[ChzzkSession] donation raw captured:', {
+          id: debugEntry.id,
+          keys: debugEntry.keys,
+          donationType: debugEntry.donationType,
+          missionHints: debugEntry.missionHints,
+        })
+        this.io.emit('debug:donationRaw', debugEntry)
+
         const db = getDB()
         const now = new Date().toISOString()
         const amount = parseInt(data.payAmount || '0', 10)
@@ -149,25 +359,58 @@ export class ChzzkSession {
           userId: data.donatorChannelId,
           nickname: data.donatorNickname || 'unknown',
           amount,
+          donationTotal: this.getDonationTotal(data.donatorChannelId || '', data.donatorNickname || 'unknown'),
           donationType: data.donationType || 'CHAT',
           message: data.donationText,
           createdAt: now,
         }
 
-        this.io.emit('donation', event)
         this.io.emit('event', event)
+        applyTamagotchiDonation(amount, event.nickname, this.io)
 
+        // ── 후원 라우팅 ───────────────────────────────────────────────────────
+        // 1. 활성화된 룰렛 중 금액이 일치하는 첫 번째 룰렛을 발동
+        // 2. 일치하는 룰렛이 없으면 채팅 후원 오버레이 발동
+        // 3. 영상 후원은 donationType 기준으로 독립 처리
+        let rouletteTriggered = false
         try {
-          const roulette = getRoulettConfig()
-          if (roulette.enabled && roulette.triggerAmounts.includes(amount) && roulette.items.length >= 2) {
-            console.log(`[Roulette] Triggered by donation: ${amount} from ${event.nickname}`)
+          const roulettes = getRoulettes()
+          const matched = roulettes.find(
+            r => r.enabled && r.triggerAmounts.includes(amount) && r.items.length >= 2
+          )
+          if (matched) {
+            rouletteTriggered = true
+            console.log(`[Roulette] "${matched.name}" triggered by ${amount} from ${event.nickname}`)
             this.io.emit('roulette:spin', {
-              items: roulette.items,
+              spinId: `donation-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+              rouletteId: matched.id,
+              items: matched.items,
+              theme: matched.theme || 'default',
+              mode: matched.mode || 'wheel',
               donation: { nickname: event.nickname, amount, message: event.message },
             })
           }
         } catch (e) {
           console.error('[Roulette] Trigger check failed:', e)
+        }
+
+        // 룰렛이 발동되지 않은 경우에만 채팅 후원 오버레이 표시
+        if (!rouletteTriggered) {
+          this.io.emit('donation', event)
+        }
+
+        // 영상 후원은 금액/룰렛과 무관하게 YouTube 링크 여부로 독립 처리
+        const videoDonation = addVideoDonation({
+          nickname: event.nickname,
+          amount,
+          message: event.message,
+          donationType: event.donationType,
+        })
+        if (videoDonation) {
+          this.io.emit('videoDonation:queue', getVideoDonationQueue())
+          if (getVideoDonationConfig().autoPlay && !isCurrentlyPlaying()) {
+            playVideoDonation(this.io, videoDonation.id)
+          }
         }
       })
 
@@ -249,35 +492,97 @@ export class ChzzkSession {
       return
     }
 
+    const headers = {
+      'Authorization': `Bearer ${this.accessToken}`,
+      'Content-Type': 'application/json',
+    }
+    // docs: "Request Param" → query parameter for these POST endpoints
+    const params = { sessionKey: this.sessionKey }
+
+    const BASE = 'https://openapi.chzzk.naver.com/open/v1/sessions/events'
+
     try {
-      const headers = {
-        'Authorization': `Bearer ${this.accessToken}`,
-        'Client-Id': this.clientId,
-        'Content-Type': 'application/json',
-      }
-      const params = { sessionKey: this.sessionKey }
-
-      const chatRes = await axios.post(
-        'https://openapi.chzzk.naver.com/open/v1/sessions/events/subscribe/chat',
-        null,
-        { headers, params }
-      )
-      console.log('[ChzzkSession] chat subscribe response:', JSON.stringify(chatRes.data))
-
-      await axios.post(
-        'https://openapi.chzzk.naver.com/open/v1/sessions/events/subscribe/donation',
-        null,
-        { headers, params }
-      )
-      await axios.post(
-        'https://openapi.chzzk.naver.com/open/v1/sessions/events/subscribe/subscription',
-        null,
-        { headers, params }
-      )
-
-      console.log('[ChzzkSession] Subscribed to CHAT / DONATION / SUBSCRIPTION')
+      const chatRes = await axios.post(`${BASE}/subscribe/chat`, null, { headers, params })
+      console.log('[ChzzkSession] chat subscribe:', chatRes.status, JSON.stringify(chatRes.data))
     } catch (err) {
-      console.error('[ChzzkSession] Subscribe failed:', err)
+      const detail = axios.isAxiosError(err)
+        ? `HTTP ${err.response?.status}: ${JSON.stringify(err.response?.data)}`
+        : String(err)
+      console.error('[ChzzkSession] chat subscribe failed:', detail)
+    }
+
+    try {
+      const donRes = await axios.post(`${BASE}/subscribe/donation`, null, { headers, params })
+      console.log('[ChzzkSession] donation subscribe:', donRes.status, JSON.stringify(donRes.data))
+    } catch (err) {
+      const detail = axios.isAxiosError(err)
+        ? `HTTP ${err.response?.status}: ${JSON.stringify(err.response?.data)}`
+        : String(err)
+      console.error('[ChzzkSession] donation subscribe failed:', detail)
+    }
+
+    try {
+      const subRes = await axios.post(`${BASE}/subscribe/subscription`, null, { headers, params })
+      console.log('[ChzzkSession] subscription subscribe:', subRes.status, JSON.stringify(subRes.data))
+    } catch (err) {
+      const detail = axios.isAxiosError(err)
+        ? `HTTP ${err.response?.status}: ${JSON.stringify(err.response?.data)}`
+        : String(err)
+      console.error('[ChzzkSession] subscription subscribe failed:', detail)
+    }
+
+    // 미션 이벤트 구독 시도 (공식 문서에 없으므로 실패해도 무시)
+    const missionEndpoints = ['mission', 'activity_feed', 'activity']
+    for (const ep of missionEndpoints) {
+      try {
+        const mRes = await axios.post(`${BASE}/subscribe/${ep}`, null, { headers, params })
+        console.log(`[ChzzkSession] ${ep} subscribe:`, mRes.status, JSON.stringify(mRes.data))
+      } catch (err) {
+        const detail = axios.isAxiosError(err)
+          ? `HTTP ${err.response?.status}: ${JSON.stringify(err.response?.data)}`
+          : String(err)
+        console.log(`[ChzzkSession] ${ep} subscribe attempt:`, detail)
+      }
+    }
+
+    console.log('[ChzzkSession] Subscribe calls completed for sessionKey:', this.sessionKey?.slice(0, 8) + '...')
+
+    // CHAT 이벤트 없이도 내부 채팅 연결 시작
+    if (!this.chatChannelId) {
+      this.fetchChatChannelIdAndStartInternal()
+    }
+  }
+
+  private async fetchChatChannelIdAndStartInternal() {
+    try {
+      // Electron 세션에서 NID 쿠키 추출 (chzzkInternalChat과 동일 패턴)
+      const { session } = await import('electron')
+      const cookies = await session.defaultSession.cookies.get({ domain: '.naver.com' })
+      const nidAuth    = cookies.find(c => c.name === 'NID_AUT')?.value
+      const nidSession = cookies.find(c => c.name === 'NID_SES')?.value
+
+      const headers: Record<string, string> = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json',
+      }
+      if (nidAuth && nidSession) {
+        headers['Cookie'] = `NID_AUT=${nidAuth}; NID_SES=${nidSession}`
+      }
+
+      const res = await axios.get(
+        `https://api.chzzk.naver.com/service/v2/channels/${this.channelId}/live-detail`,
+        { headers, timeout: 10000 }
+      )
+      const chatChannelId = res.data?.content?.chatChannelId
+      if (chatChannelId && !this.chatChannelId) {
+        this.chatChannelId = chatChannelId
+        console.log('[ChzzkSession] chatChannelId (from live-detail API):', chatChannelId)
+        this.startInternalChat(chatChannelId)
+      } else {
+        console.log('[ChzzkSession] live-detail: chatChannelId 없음 (오프라인?)', JSON.stringify(res.data?.content))
+      }
+    } catch (err) {
+      console.error('[ChzzkSession] chatChannelId fetch 실패:', err instanceof Error ? err.message : err)
     }
   }
 
@@ -292,6 +597,28 @@ export class ChzzkSession {
     }, delay)
   }
 
+  private startInternalChat(chatChannelId: string) {
+    if (this.internalChat) return  // 이미 연결 중
+    this.internalChat = new ChzzkInternalChat(
+      chatChannelId,
+      (mission) => {
+        try {
+          saveMissionToDB(this.channelId, mission)
+        } catch (err) {
+          console.error('[ChzzkSession] mission DB save failed:', err)
+        }
+        this.io.emit('mission', mission)
+        console.log('[ChzzkSession] mission emit:', mission.missionText, mission.status)
+      },
+      (raw) => {
+        this.io.emit('debug:internalDonationRaw', raw)
+      },
+    )
+    this.internalChat.connect().catch((err) => {
+      console.error('[ChzzkSession] internalChat connect 실패:', err)
+    })
+  }
+
   disconnect() {
     this.destroyed = true
     if (this.reconnectTimer) {
@@ -302,6 +629,8 @@ export class ChzzkSession {
       this.socket.disconnect()
       this.socket = null
     }
+    this.internalChat?.destroy()
+    this.internalChat = null
     this.sessionKey = null
   }
 }
@@ -315,10 +644,10 @@ interface ChzzkChatEvent {
   channelId?: string
   senderChannelId?: string
   chatChannelId?: string
-  profile?: { nickname: string; badges?: unknown[]; verifiedMark?: boolean }
+  profile?: unknown
   userRoleCode?: string
   content: string
-  emojis?: Record<string, string>
+  emojis?: unknown
   messageTime?: number
 }
 

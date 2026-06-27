@@ -65,7 +65,7 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-bg-outer p-6">
+    <div className="flex items-center justify-center min-h-full bg-bg-outer p-6">
       <div className="w-full max-w-md space-y-4">
 
         {/* 브랜드 헤더 */}

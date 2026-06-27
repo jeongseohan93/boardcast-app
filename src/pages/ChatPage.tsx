@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { Send, Plus, Trash2, Check, X, MessageSquare, Bot } from 'lucide-react'
-import { chatApi, botApi } from '../api/client'
+import { Send, Plus, Trash2, Check, X, MessageSquare, Bot, Megaphone, MoreVertical, ShieldBan, EyeOff, Clock } from 'lucide-react'
+import { chatApi, botApi, channelApi } from '../api/client'
 import { useChatStore, ChatMessage } from '../store/chatStore'
 import { useToastStore } from '../store/toastStore'
 import Button from '../components/Button'
 import { renderWithEmojis } from '../utils/chat'
+import { getVipTier } from '../utils/vip'
+import { ChatBadges } from '../utils/badges'
 
 interface BotCommand {
   id: string
@@ -32,6 +34,9 @@ export default function ChatPage() {
 
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+  const [noticing, setNoticing] = useState(false)
+  const [actionMenuId, setActionMenuId] = useState<string | null>(null)
+  const [moderationBusy, setModerationBusy] = useState<string>('')
   const chatEndRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
 
@@ -42,6 +47,20 @@ export default function ChatPage() {
   const [showAddForm, setShowAddForm] = useState(false)
 
   useEffect(() => { loadCommands() }, [])
+
+  useEffect(() => {
+    if (!actionMenuId) return
+    const closeMenu = () => setActionMenuId(null)
+    const closeOnEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeMenu()
+    }
+    window.addEventListener('click', closeMenu)
+    window.addEventListener('keydown', closeOnEsc)
+    return () => {
+      window.removeEventListener('click', closeMenu)
+      window.removeEventListener('keydown', closeOnEsc)
+    }
+  }, [actionMenuId])
 
   useEffect(() => {
     if (isAtBottom) chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -71,6 +90,18 @@ export default function ChatPage() {
     finally { setSending(false) }
   }
 
+  const handleNotice = async () => {
+    const message = input.trim()
+    if (!message) return
+    setNoticing(true)
+    try {
+      await chatApi.notice({ message })
+      setInput('')
+      addToast({ type: 'info', title: '공지 등록 완료', message })
+    } catch { addToast({ type: 'error', title: '공지 등록 실패' }) }
+    finally { setNoticing(false) }
+  }
+
   const handleAddCommand = async () => {
     if (!newCmd.trigger?.trim() || !newCmd.response?.trim()) return
     try {
@@ -93,8 +124,42 @@ export default function ChatPage() {
     } catch { addToast({ type: 'error', title: '명령어 업데이트 실패' }) }
   }
 
+  const targetIdOf = (msg: ChatMessage) => msg.userId || msg.senderChannelId || ''
+
+  const runModeration = async (action: 'restrict' | 'temporary' | 'blind', msg: ChatMessage) => {
+    const targetChannelId = targetIdOf(msg)
+    if (!targetChannelId) {
+      addToast({ type: 'error', title: '사용자 채널 ID가 없어 처리할 수 없습니다' })
+      return
+    }
+
+    const busyKey = `${action}:${msg.id}`
+    setModerationBusy(busyKey)
+    setActionMenuId(null)
+    try {
+      if (action === 'restrict') {
+        await channelApi.addRestriction(targetChannelId)
+        addToast({ type: 'info', title: `${msg.nickname} 활동제한 추가` })
+      } else if (action === 'temporary') {
+        if (!msg.chatChannelId) throw new Error('chatChannelId required')
+        await channelApi.addTemporaryRestriction({ targetChannelId, chatChannelId: msg.chatChannelId })
+        addToast({ type: 'info', title: `${msg.nickname} 임시제한 추가` })
+      } else {
+        const messageTime = msg.messageTime || (msg.timestamp ? new Date(msg.timestamp).getTime() : 0)
+        const senderChannelId = msg.senderChannelId || targetChannelId
+        if (!msg.chatChannelId || !messageTime) throw new Error('message metadata required')
+        await chatApi.blindMessage({ chatChannelId: msg.chatChannelId, messageTime, senderChannelId })
+        addToast({ type: 'info', title: `${msg.nickname} 메시지 숨김 처리` })
+      }
+    } catch {
+      addToast({ type: 'error', title: '활동 제한 처리 실패' })
+    } finally {
+      setModerationBusy('')
+    }
+  }
+
   return (
-    <div className="flex h-screen bg-bg-outer overflow-hidden gap-3 p-3">
+    <div className="flex h-full bg-bg-outer overflow-hidden gap-3 p-3">
 
       {/* ── 채팅 영역 ── */}
       <div className="flex-1 flex flex-col min-w-0 bg-bg-card border border-border rounded-2xl overflow-hidden">
@@ -118,7 +183,16 @@ export default function ChatPage() {
               </div>
             ) : (
               <div className="px-3 py-2 space-y-0.5">
-                {messages.map((msg) => <ChatBubble key={msg.id} msg={msg} />)}
+                {messages.map((msg) => (
+                  <ChatBubble
+                    key={msg.id}
+                    msg={msg}
+                    menuOpen={actionMenuId === msg.id}
+                    busy={moderationBusy.endsWith(`:${msg.id}`)}
+                    onToggleMenu={() => setActionMenuId((id) => (id === msg.id ? null : msg.id))}
+                    onModeration={(action) => runModeration(action, msg)}
+                  />
+                ))}
                 <div ref={chatEndRef} />
               </div>
             )}
@@ -142,8 +216,16 @@ export default function ChatPage() {
             onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
           />
           <button
+            onClick={handleNotice}
+            disabled={noticing || sending || !input.trim()}
+            title="공지로 등록"
+            className="px-3 border border-accent-purple/40 text-accent-purple rounded-xl hover:bg-accent-purple/10 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+          >
+            <Megaphone size={14} />
+          </button>
+          <button
             onClick={handleSend}
-            disabled={sending || !input.trim()}
+            disabled={sending || noticing || !input.trim()}
             className="px-3 bg-accent-mint text-bg-outer rounded-xl hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
           >
             <Send size={14} />
@@ -250,16 +332,94 @@ export default function ChatPage() {
   )
 }
 
-function ChatBubble({ msg }: { msg: ChatMessage }) {
+function ChatBubble({
+  msg,
+  menuOpen,
+  busy,
+  onToggleMenu,
+  onModeration,
+}: {
+  msg: ChatMessage
+  menuOpen: boolean
+  busy: boolean
+  onToggleMenu: () => void
+  onModeration: (action: 'restrict' | 'temporary' | 'blind') => void
+}) {
+  const vip = getVipTier(msg.donationTotal ?? 0)
+  const canModerate = !!(msg.userId || msg.senderChannelId)
+  const canUseChatAction = !!msg.chatChannelId
+
   return (
-    <div className="flex gap-2 hover:bg-white/3 rounded-lg px-1.5 py-1 transition-colors">
-      <span className="text-sm font-semibold shrink-0 leading-snug" style={{ color: getNickColor(msg.nickname) }}>
-        {msg.nickname}
-      </span>
+    <div className={`group relative flex gap-2 rounded-lg px-1.5 py-1 transition-colors ${vip ? vip.rowClass : 'hover:bg-white/3'}`}>
+      <div className="flex items-center gap-1.5 shrink-0 leading-snug">
+        <ChatBadges badges={msg.badges} />
+        {vip && (
+          <span className={`text-[10px] px-1.5 py-0.5 rounded border font-bold ${vip.badgeClass}`}>
+            {vip.label}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggleMenu()
+          }}
+          disabled={!canModerate || busy}
+          className={`text-sm font-semibold rounded px-1 -mx-1 transition-colors disabled:cursor-default ${vip ? vip.nameClass : 'hover:bg-white/5'}`}
+          style={vip ? undefined : { color: getNickColor(msg.nickname) }}
+        >
+          {msg.nickname}
+        </button>
+      </div>
       <span
-        className="text-sm text-text-secondary break-all leading-snug"
+        className="text-sm text-text-secondary break-all leading-snug pr-6"
         dangerouslySetInnerHTML={{ __html: renderWithEmojis(msg.message, msg.emojis) }}
       />
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation()
+          onToggleMenu()
+        }}
+        disabled={!canModerate || busy}
+        className="absolute right-1 top-1 opacity-0 group-hover:opacity-100 disabled:opacity-20 text-text-muted hover:text-text-secondary transition-opacity"
+        title="채팅 관리"
+      >
+        <MoreVertical size={14} />
+      </button>
+
+      {menuOpen && (
+        <div
+          className="absolute left-2 top-8 z-30 w-44 overflow-hidden rounded-xl border border-border bg-bg-card shadow-xl"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => onModeration('restrict')}
+            className="flex w-full items-center gap-2 px-3 py-2 text-xs text-text-secondary hover:bg-accent-danger/10 hover:text-accent-danger transition-colors"
+          >
+            <ShieldBan size={13} /> 활동제한
+          </button>
+          <button
+            type="button"
+            onClick={() => onModeration('temporary')}
+            disabled={!canUseChatAction}
+            className="flex w-full items-center gap-2 px-3 py-2 text-xs text-text-secondary hover:bg-accent-warning/10 hover:text-accent-warning transition-colors disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-text-secondary"
+            title={canUseChatAction ? '임시제한' : '채팅 채널 정보가 있는 실시간 메시지만 가능합니다'}
+          >
+            <Clock size={13} /> 임시제한
+          </button>
+          <button
+            type="button"
+            onClick={() => onModeration('blind')}
+            disabled={!canUseChatAction}
+            className="flex w-full items-center gap-2 px-3 py-2 text-xs text-text-secondary hover:bg-white/5 hover:text-text-primary transition-colors disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-text-secondary"
+            title={canUseChatAction ? '메시지 숨김' : '채팅 채널 정보가 있는 실시간 메시지만 가능합니다'}
+          >
+            <EyeOff size={13} /> 메시지 숨김
+          </button>
+        </div>
+      )}
     </div>
   )
 }

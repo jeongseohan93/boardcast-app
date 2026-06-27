@@ -1,33 +1,39 @@
-/**
- * [팔로우 폴링 서비스]
- *
- * CHZZK WebSocket API는 팔로우 이벤트를 실시간으로 제공하지 않는다.
- * 대신 30초마다 채널 정보 API를 호출해 팔로워 수 증가를 감지한다.
- *
- * 감지 방식:
- *   - 첫 폴링 시 현재 팔로워 수를 기준값으로 저장
- *   - 이후 폴링에서 숫자가 늘었으면 → DB 저장 + Socket.IO emit
- *   - 줄었으면 조용히 업데이트 (언팔은 이벤트 발생 안 함)
- */
-
 import { Server as SocketIOServer } from 'socket.io'
 import Store from 'electron-store'
 import { getDB } from '../db/index'
-import { getChannelInfo } from './chzzkApi'
+import { getChannelFollowers, getChannelInfo, getMyChannel } from './chzzkApi'
+import { applyTamagotchiFollow } from './tamagotchiService'
 
 const store = new Store()
 
+interface Follower {
+  channelId: string
+  channelName: string
+  createdDate?: string
+}
+
+type FollowEventType = 'FOLLOW' | 'UNFOLLOW'
+
+interface FollowerDiff {
+  follower_channel_id: string
+  nickname: string
+}
+
 export class PollService {
+  private accessToken: string
   private channelId: string
   private clientId: string
   private clientSecret: string
   private io: SocketIOServer
   private intervalId: ReturnType<typeof setInterval> | null = null
-  private lastFollowerCount: number = -1  // -1: 아직 기준값 없음 (첫 폴링 전)
-  private readonly INTERVAL = 30_000      // 30초
+  private isPolling = false
+  private tokenMatchesChannel: boolean | null = null
+  private lastCount = -1
+  private readonly INTERVAL = 10_000
+  private readonly PAGE_SIZE = 50
 
-  // accessToken은 Client 인증으로 대체돼 불필요하지만 시그니처 호환을 위해 유지
-  constructor(_accessToken: string, channelId: string, clientId: string, clientSecret: string, io: SocketIOServer) {
+  constructor(accessToken: string, channelId: string, clientId: string, clientSecret: string, io: SocketIOServer) {
+    this.accessToken = accessToken
     this.channelId = channelId
     this.clientId = clientId
     this.clientSecret = clientSecret
@@ -35,9 +41,8 @@ export class PollService {
   }
 
   start() {
-    // 시작하자마자 즉시 1회 폴링 (기준값 설정)
-    this.poll()
-    this.intervalId = setInterval(() => this.poll(), this.INTERVAL)
+    void this.poll()
+    this.intervalId = setInterval(() => void this.poll(), this.INTERVAL)
     console.log('[PollService] Started')
   }
 
@@ -49,51 +54,242 @@ export class PollService {
     console.log('[PollService] Stopped')
   }
 
-  private async poll() {
-    try {
-      // 채널 정보는 Client 인증 API 사용 (Bearer 아님)
-      const channelInfo = await getChannelInfo(this.clientId, this.clientSecret, this.channelId)
-      const followerCount: number = channelInfo?.followerCount ?? 0
+  private async getAllFollowers(): Promise<Follower[]> {
+    const all: Follower[] = []
+    let page = 0
 
-      // 매 폴링마다 store 갱신 — auth/status가 항상 최신 값을 반환할 수 있도록
+    while (true) {
+      const result = await getChannelFollowers(this.accessToken, { page, size: this.PAGE_SIZE })
+      const batch: Follower[] = result?.data ?? []
+      all.push(...batch)
+
+      if (batch.length < this.PAGE_SIZE) break
+      page += 1
+    }
+
+    return all
+  }
+
+  private saveFollowerRows(table: 'follower_list' | 'follower_list_staging', followers: Follower[]) {
+    const db = getDB()
+    const upsert = db.prepare(
+      `INSERT OR REPLACE INTO ${table} (channel_id, follower_channel_id, nickname, followed_at) VALUES (?, ?, ?, ?)`
+    )
+    const now = new Date().toISOString()
+
+    db.transaction(() => {
+      db.prepare(`DELETE FROM ${table} WHERE channel_id = ?`).run(this.channelId)
+      for (const follower of followers) {
+        if (!follower.channelId) continue
+        upsert.run(this.channelId, follower.channelId, follower.channelName, follower.createdDate ?? now)
+      }
+    })()
+
+    console.log(`[PollService] ${table} saved: ${followers.length}`)
+  }
+
+  private saveFollowerList(followers: Follower[]) {
+    this.saveFollowerRows('follower_list', followers)
+  }
+
+  private saveFollowerStaging(followers: Follower[]) {
+    this.saveFollowerRows('follower_list_staging', followers)
+  }
+
+  private getDiffFromStaging() {
+    const db = getDB()
+    const newFollowers = db.prepare(`
+      SELECT s.follower_channel_id, s.nickname
+      FROM follower_list_staging s
+      LEFT JOIN follower_list f
+        ON f.channel_id = s.channel_id
+       AND f.follower_channel_id = s.follower_channel_id
+      WHERE s.channel_id = ?
+        AND f.follower_channel_id IS NULL
+    `).all(this.channelId) as FollowerDiff[]
+
+    const removedFollowers = db.prepare(`
+      SELECT f.follower_channel_id, f.nickname
+      FROM follower_list f
+      LEFT JOIN follower_list_staging s
+        ON s.channel_id = f.channel_id
+       AND s.follower_channel_id = f.follower_channel_id
+      WHERE f.channel_id = ?
+        AND s.follower_channel_id IS NULL
+    `).all(this.channelId) as FollowerDiff[]
+
+    return { newFollowers, removedFollowers }
+  }
+
+  private promoteStagingToFollowerList() {
+    const db = getDB()
+
+    db.transaction(() => {
+      db.prepare(`DELETE FROM follower_list WHERE channel_id = ?`).run(this.channelId)
+      db.prepare(`
+        INSERT INTO follower_list (channel_id, follower_channel_id, nickname, followed_at)
+        SELECT channel_id, follower_channel_id, nickname, followed_at
+        FROM follower_list_staging
+        WHERE channel_id = ?
+      `).run(this.channelId)
+    })()
+  }
+
+  private hasExpectedFollowerList(followers: Follower[], followerCount: number) {
+    if (followers.length === followerCount) return true
+
+    console.warn(
+      `[PollService] follower list count mismatch. targetCount=${followerCount}, listCount=${followers.length}. ` +
+      'Skip diff/update because the access token may belong to another channel.'
+    )
+    return false
+  }
+
+  private async ensureAccessTokenMatchesChannel() {
+    if (this.tokenMatchesChannel !== null) return this.tokenMatchesChannel
+
+    try {
+      const me = await getMyChannel(this.accessToken)
+      this.tokenMatchesChannel = me.channelId === this.channelId
+
+      if (!this.tokenMatchesChannel) {
+        console.warn(
+          `[PollService] accessToken channel mismatch. tokenChannelId=${me.channelId}, targetChannelId=${this.channelId}. ` +
+          'Skip follower-list polling to avoid checking the wrong channel.'
+        )
+      }
+
+      return this.tokenMatchesChannel
+    } catch (error) {
+      this.tokenMatchesChannel = false
+      console.error('[PollService] failed to verify accessToken channel:', error)
+      return false
+    }
+  }
+
+  private insertFollowEvent(
+    type: FollowEventType,
+    targetChannelId: string | null,
+    nickname: string | null,
+    followerCount: number,
+    createdAt: string
+  ) {
+    const db = getDB()
+    let rowId: number | bigint = Date.now()
+    let removedUnfollowCount = 0
+
+    try {
+      if (type === 'FOLLOW' && targetChannelId) {
+        const deleted = db.prepare(`
+          DELETE FROM follows
+          WHERE channel_id = ?
+            AND event_type = 'UNFOLLOW'
+            AND target_channel_id = ?
+        `).run(this.channelId, targetChannelId)
+        removedUnfollowCount = deleted.changes
+      }
+
+      const row = db.prepare(
+        `INSERT INTO follows (channel_id, event_type, target_channel_id, nickname, follower_count, created_at) VALUES (?, ?, ?, ?, ?, ?)`
+      ).run(this.channelId, type, targetChannelId, nickname, followerCount, createdAt)
+      rowId = row.lastInsertRowid
+    } catch (error) {
+      console.error(`[PollService] follows INSERT(${type}) error:`, error)
+    }
+
+    const event = {
+      id: rowId,
+      type,
+      channelId: this.channelId,
+      targetChannelId: targetChannelId ?? undefined,
+      nickname: nickname ?? undefined,
+      followerCount,
+      createdAt,
+      removedUnfollowCount,
+    }
+
+    this.io.emit(type === 'FOLLOW' ? 'follow' : 'unfollow', event)
+    this.io.emit('event', event)
+    if (type === 'FOLLOW') {
+      applyTamagotchiFollow(nickname ?? undefined, this.io)
+    }
+    return event
+  }
+
+  private emitCountOnlyEvent(type: FollowEventType, followerCount: number, createdAt: string) {
+    const event = this.insertFollowEvent(type, null, null, followerCount, createdAt)
+    console.log(`[PollService] ${type}: count-only event (total=${followerCount})`)
+    return event
+  }
+
+  private async poll() {
+    if (this.isPolling) return
+    this.isPolling = true
+
+    try {
+      const tokenOk = await this.ensureAccessTokenMatchesChannel()
+      if (!tokenOk) return
+
+      const channelInfo = await getChannelInfo(this.clientId, this.clientSecret, this.channelId)
+      const followerCount = channelInfo?.followerCount ?? 0
       store.set('followerCount', followerCount)
 
-      // 첫 폴링: 기준값만 저장하고 이벤트는 발생시키지 않음
-      // (앱 시작할 때마다 팔로우 알림 뜨는 것을 방지)
-      if (this.lastFollowerCount === -1) {
-        this.lastFollowerCount = followerCount
+      if (this.lastCount === -1) {
+        const followers = await this.getAllFollowers()
+        if (!this.hasExpectedFollowerList(followers, followerCount)) return
+        this.saveFollowerList(followers)
+        this.lastCount = followerCount
+        console.log(`[PollService] Baseline: count=${followerCount}, saved=${followers.length}`)
         return
       }
 
-      if (followerCount > this.lastFollowerCount) {
-        // 팔로워 증가 → DB 기록 + 실시간 알림
-        const db = getDB()
-        const now = new Date().toISOString()
+      const delta = followerCount - this.lastCount
+      console.log(`[PollService] poll: ${this.lastCount} -> ${followerCount} (delta=${delta})`)
 
-        const stmt = db.prepare(
-          `INSERT INTO follows (channel_id, follower_count, created_at) VALUES (?, ?, ?)`
-        )
-        const result = stmt.run(this.channelId, followerCount, now)
-
-        const event = {
-          id: result.lastInsertRowid,
-          type: 'FOLLOW',
-          channelId: this.channelId,
-          followerCount,
-          prevFollowerCount: this.lastFollowerCount, // 이전 값 (증가량 계산용)
-          createdAt: now,
-        }
-
-        this.io.emit('follow', event)   // 팔로우 전용 채널
-        this.io.emit('event', event)    // 통합 이벤트 채널
-
-        console.log(`[PollService] New followers: ${this.lastFollowerCount} → ${followerCount}`)
+      if (delta === 0) {
+        this.lastCount = followerCount
+        return
       }
 
-      // 증가/감소 모두 기준값 업데이트
-      this.lastFollowerCount = followerCount
-    } catch (err) {
-      console.error('[PollService] Poll error:', err)
+      let currentFollowers: Follower[] | null = null
+      try {
+        currentFollowers = await this.getAllFollowers()
+      } catch (error) {
+        const now = new Date().toISOString()
+        this.emitCountOnlyEvent(delta > 0 ? 'FOLLOW' : 'UNFOLLOW', followerCount, now)
+        this.lastCount = followerCount
+        console.error('[PollService] follower list fetch failed; emitted count-only event:', error)
+        return
+      }
+
+      if (!this.hasExpectedFollowerList(currentFollowers, followerCount)) return
+
+      this.saveFollowerStaging(currentFollowers)
+      const { newFollowers, removedFollowers } = this.getDiffFromStaging()
+      const now = new Date().toISOString()
+
+      console.log(`[PollService] diff: follow=${newFollowers.length}, unfollow=${removedFollowers.length}`)
+
+      for (const follower of newFollowers) {
+        this.insertFollowEvent('FOLLOW', follower.follower_channel_id, follower.nickname, followerCount, now)
+        console.log(`[PollService] Follow: ${follower.nickname} (total=${followerCount})`)
+      }
+
+      for (const follower of removedFollowers) {
+        this.insertFollowEvent('UNFOLLOW', follower.follower_channel_id, follower.nickname, followerCount, now)
+        console.log(`[PollService] Unfollow: ${follower.nickname} (total=${followerCount})`)
+      }
+
+      if (newFollowers.length === 0 && removedFollowers.length === 0) {
+        this.emitCountOnlyEvent(delta > 0 ? 'FOLLOW' : 'UNFOLLOW', followerCount, now)
+      }
+
+      this.promoteStagingToFollowerList()
+      this.lastCount = followerCount
+    } catch (error) {
+      console.error('[PollService] Poll error:', error)
+    } finally {
+      this.isPolling = false
     }
   }
 }

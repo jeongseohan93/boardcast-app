@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>룰렛 리스트 오버레이</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: transparent;
+    font-family: 'Segoe UI', 'Malgun Gothic', sans-serif;
+    overflow: hidden;
+    width: 1920px;
+    height: 1080px;
+    pointer-events: none;
+  }
+
+  #container {
+    position: fixed;
+    top: 40px;
+    right: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 280px;
+    max-width: 400px;
+  }
+
+  .list-card {
+    background: linear-gradient(135deg, rgba(17,19,26,0.92), rgba(23,25,32,0.92));
+    border: 1px solid rgba(0,255,163,0.25);
+    border-radius: 16px;
+    padding: 14px 18px;
+    backdrop-filter: blur(8px);
+    overflow: hidden;
+    transition: border-color 0.3s ease;
+  }
+  .list-card.flash {
+    border-color: rgba(0,255,163,0.8);
+    animation: cardFlash 0.6s ease;
+  }
+  @keyframes cardFlash {
+    0%   { box-shadow: 0 0 0 rgba(0,255,163,0); }
+    40%  { box-shadow: 0 0 24px rgba(0,255,163,0.5); }
+    100% { box-shadow: 0 0 0 rgba(0,255,163,0); }
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .card-name {
+    color: rgba(255,255,255,0.5);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  /* ── numeric 타입 ── */
+  .numeric-total {
+    color: #00FFA3;
+    font-size: 36px;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    line-height: 1;
+    text-shadow: 0 0 20px rgba(0,255,163,0.4);
+    transition: color 0.3s ease;
+  }
+  .numeric-total.positive { color: #00FFA3; }
+  .numeric-total.negative { color: #FF6B6B; }
+
+  .numeric-delta {
+    font-size: 13px;
+    font-weight: 700;
+    margin-left: 8px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+  .numeric-delta.show { opacity: 1; }
+  .numeric-delta.pos { color: #00FFA3; }
+  .numeric-delta.neg { color: #FF6B6B; }
+
+  .numeric-entries {
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .numeric-entry {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    color: rgba(255,255,255,0.4);
+  }
+  .numeric-entry-label { }
+  .numeric-entry-value { font-weight: 600; color: rgba(255,255,255,0.55); }
+
+  /* ── count 타입 ── */
+  .count-entries {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .count-entry {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    background: rgba(255,255,255,0.04);
+    border-radius: 10px;
+    transition: background 0.2s ease;
+  }
+  .count-entry.new-flash {
+    animation: entryFlash 0.5s ease;
+  }
+  @keyframes entryFlash {
+    0%   { background: rgba(0,255,163,0.25); }
+    100% { background: rgba(255,255,255,0.04); }
+  }
+  .count-entry-label {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.85);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .count-badge {
+    background: rgba(0,255,163,0.15);
+    color: #00FFA3;
+    border: 1px solid rgba(0,255,163,0.3);
+    border-radius: 20px;
+    padding: 2px 10px;
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+    min-width: 36px;
+    text-align: center;
+  }
+  .count-total {
+    color: rgba(255,255,255,0.3);
+    font-size: 11px;
+    margin-top: 6px;
+    text-align: right;
+  }
+</style>
+</head>
+<body>
+<div id="container"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const container = document.getElementById('container')
+let state = {}   // id → RouletteListItem
+
+function render() {
+  const items = Object.values(state)
+  container.innerHTML = ''
+  items.forEach(item => {
+    const card = document.createElement('div')
+    card.className = 'list-card'
+    card.id = `card-${item.id}`
+
+    if (item.type === 'numeric') {
+      const isNeg = item.total < 0
+      const entries = item.entries.slice().sort((a, b) => Math.abs(b.value) - Math.abs(a.value)).slice(0, 5)
+
+      card.innerHTML = `
+        <div class="card-header">
+          <span class="card-name">${esc(item.name)}</span>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:4px">
+          <span class="numeric-total ${isNeg ? 'negative' : 'positive'}" id="total-${item.id}">
+            ${item.total.toLocaleString()}
+          </span>
+          <span class="numeric-delta" id="delta-${item.id}"></span>
+        </div>
+        ${entries.length > 0 ? `
+        <div class="numeric-entries">
+          ${entries.map(e => `
+            <div class="numeric-entry">
+              <span class="numeric-entry-label">${esc(e.label)} ×${e.count}</span>
+              <span class="numeric-entry-value">${e.value > 0 ? '+' : ''}${e.value.toLocaleString()}</span>
+            </div>
+          `).join('')}
+        </div>` : ''}
+      `
+    } else {
+      const entries = item.entries.slice().sort((a, b) => b.count - a.count)
+      card.innerHTML = `
+        <div class="card-header">
+          <span class="card-name">${esc(item.name)}</span>
+        </div>
+        <div class="count-entries" id="entries-${item.id}">
+          ${entries.length === 0
+            ? '<div style="color:rgba(255,255,255,0.25);font-size:12px;text-align:center;padding:8px 0">결과 없음</div>'
+            : entries.map(e => `
+              <div class="count-entry" id="entry-${item.id}-${slugId(e.label)}">
+                <span class="count-entry-label">${esc(e.label)}</span>
+                <span class="count-badge">×${e.count}</span>
+              </div>
+            `).join('')
+          }
+        </div>
+        ${item.total > 0 ? `<div class="count-total">총 ${item.total}회</div>` : ''}
+      `
+    }
+
+    container.appendChild(card)
+  })
+}
+
+function esc(str) {
+  return String(str ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
+}
+
+function slugId(str) {
+  return String(str).replace(/[^a-zA-Z0-9가-힣]/g, '_').slice(0, 20)
+}
+
+function flashCard(id) {
+  const card = document.getElementById(`card-${id}`)
+  if (!card) return
+  card.classList.remove('flash')
+  void card.offsetWidth
+  card.classList.add('flash')
+  setTimeout(() => card.classList.remove('flash'), 700)
+}
+
+function showDelta(id, delta) {
+  const el = document.getElementById(`delta-${id}`)
+  if (!el) return
+  const sign = delta >= 0 ? '+' : ''
+  el.textContent = `${sign}${delta.toLocaleString()}`
+  el.className = `numeric-delta show ${delta >= 0 ? 'pos' : 'neg'}`
+  clearTimeout(el._timer)
+  el._timer = setTimeout(() => { el.classList.remove('show') }, 2500)
+}
+
+function applyUpdate(item) {
+  const prev = state[item.id]
+  state[item.id] = item
+
+  if (!prev) {
+    render()
+    return
+  }
+
+  // 해당 카드만 업데이트
+  const card = document.getElementById(`card-${item.id}`)
+  if (!card) { render(); return }
+
+  flashCard(item.id)
+
+  if (item.type === 'numeric') {
+    const totalEl = document.getElementById(`total-${item.id}`)
+    if (totalEl) {
+      totalEl.textContent = item.total.toLocaleString()
+      totalEl.className = `numeric-total ${item.total < 0 ? 'negative' : 'positive'}`
+    }
+    const delta = item.total - prev.total
+    if (delta !== 0) showDelta(item.id, delta)
+  } else {
+    render()  // count 타입은 항목이 추가되므로 전체 재렌더
+  }
+}
+
+// 초기 로드
+fetch('/api/roulette-list/state')
+  .then(r => r.ok ? r.json() : [])
+  .then(items => {
+    items.forEach(item => { state[item.id] = item })
+    render()
+  })
+  .catch(() => {})
+
+const socket = io()
+
+socket.on('rouletteList:update', (item) => {
+  if (!item?.id) return
+  applyUpdate(item)
+})
+
+socket.on('rouletteList:deleted', ({ id }) => {
+  if (!id) return
+  delete state[id]
+  render()
+})
+</script>
+</body>
+</html>

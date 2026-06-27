@@ -9,7 +9,7 @@ const store = new Store()
 function secureGet(key: string): string | null {
   try {
     const b64 = store.get(`secure_${key}`) as string | undefined
-    if (!b64) return store.get(`${key}_plain`) as string | null ?? null
+    if (!b64) return store.get(`secure_${key}_plain`) as string | null ?? null
     return safeStorage.decryptString(Buffer.from(b64, 'base64'))
   } catch {
     return null

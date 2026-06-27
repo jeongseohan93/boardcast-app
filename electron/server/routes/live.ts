@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import Store from 'electron-store'
 import { safeStorage } from 'electron'
-import { getLiveSetting, updateLiveSetting } from '../services/chzzkApi'
+import { getLiveSetting, updateLiveSetting, getLiveList } from '../services/chzzkApi'
 
 const router = Router()
 const store = new Store()
@@ -15,6 +15,36 @@ function getAccessToken(): string | null {
     return null
   }
 }
+
+// 라이브 목록 조회 (Client 인증)
+router.get('/list', async (req, res) => {
+  const b64Id = store.get('secure_clientId') as string | undefined
+  const b64Secret = store.get('secure_clientSecret') as string | undefined
+
+  let clientId: string | null = null
+  let clientSecret: string | null = null
+  try {
+    if (b64Id) clientId = safeStorage.decryptString(Buffer.from(b64Id, 'base64'))
+    else clientId = store.get('secure_clientId_plain') as string | null ?? null
+    if (b64Secret) clientSecret = safeStorage.decryptString(Buffer.from(b64Secret, 'base64'))
+    else clientSecret = store.get('secure_clientSecret_plain') as string | null ?? null
+  } catch {
+    clientId = store.get('secure_clientId_plain') as string | null ?? null
+    clientSecret = store.get('secure_clientSecret_plain') as string | null ?? null
+  }
+
+  if (!clientId || !clientSecret) return res.status(401).json({ error: 'Not authenticated' })
+
+  try {
+    const size = req.query.size !== undefined ? Number(req.query.size) : undefined
+    const next = req.query.next as string | undefined
+    const data = await getLiveList(clientId, clientSecret, { size, next })
+    return res.json(data)
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+    return res.status(500).json({ error: message })
+  }
+})
 
 // 방송 설정 조회
 router.get('/setting', async (_req, res) => {

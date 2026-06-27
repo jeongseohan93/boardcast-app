@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react'
-import { Plus, Trash2, Check, X, Bot, Pencil } from 'lucide-react'
-import { botApi } from '../api/client'
+import { Plus, Trash2, Check, X, Bot, Pencil, Bell, Clock } from 'lucide-react'
+import { botApi, autoNoticeApi } from '../api/client'
 import { useToastStore } from '../store/toastStore'
+
+interface AutoNotice {
+  id: string
+  message: string
+  intervalMinutes: number
+  enabled: boolean
+}
 
 interface BotCommand {
   id: string
@@ -29,10 +36,6 @@ const PERMISSION_COLOR: Record<BotCommand['permission'], string> = {
 export default function BotPage() {
   const addToast = useToastStore((s) => s.addToast)
 
-  const [botName, setBotName]           = useState('')
-  const [botNameSaved, setBotNameSaved] = useState(false)
-  const [nameSaving, setNameSaving]     = useState(false)
-
   const [commands, setCommands]         = useState<BotCommand[]>([])
   const [showAdd, setShowAdd]           = useState(false)
   const [editingId, setEditingId]       = useState<string | null>(null)
@@ -40,25 +43,59 @@ export default function BotPage() {
     trigger: '', response: '', cooldown: 5, permission: 'everyone', enabled: true,
   })
 
-  useEffect(() => { loadBotName(); loadCommands() }, [])
+  const [notices, setNotices]           = useState<AutoNotice[]>([])
+  const [showAddNotice, setShowAddNotice] = useState(false)
+  const [editingNoticeId, setEditingNoticeId] = useState<string | null>(null)
+  const [noticeForm, setNoticeForm]     = useState({ message: '', intervalMinutes: 10 })
 
-  const loadBotName = async () => {
-    const saved = await window.electronAPI.store.get('botName') as string | null
-    if (saved) setBotName(saved)
-  }
+  useEffect(() => { loadCommands(); loadNotices() }, [])
 
   const loadCommands = async () => {
     try { const res = await botApi.list(); setCommands(res.data) }
     catch { addToast({ type: 'error', title: '명령어 로드 실패' }) }
   }
 
-  const handleSaveBotName = async () => {
-    if (!botName.trim()) return
-    setNameSaving(true)
-    await window.electronAPI.store.set('botName', botName.trim())
-    setNameSaving(false)
-    setBotNameSaved(true)
-    setTimeout(() => setBotNameSaved(false), 2000)
+  const loadNotices = async () => {
+    try { const res = await autoNoticeApi.list(); setNotices(res.data) }
+    catch { addToast({ type: 'error', title: '자동 공지 로드 실패' }) }
+  }
+
+  const handleAddNotice = async () => {
+    if (!noticeForm.message.trim() || noticeForm.intervalMinutes <= 0) return
+    try {
+      await autoNoticeApi.create(noticeForm)
+      await loadNotices()
+      setNoticeForm({ message: '', intervalMinutes: 10 })
+      setShowAddNotice(false)
+    } catch { addToast({ type: 'error', title: '자동 공지 추가 실패' }) }
+  }
+
+  const handleSaveNotice = async () => {
+    if (!editingNoticeId || !noticeForm.message.trim()) return
+    try {
+      await autoNoticeApi.update(editingNoticeId, noticeForm)
+      await loadNotices()
+      setEditingNoticeId(null)
+      setNoticeForm({ message: '', intervalMinutes: 10 })
+    } catch { addToast({ type: 'error', title: '자동 공지 수정 실패' }) }
+  }
+
+  const handleDeleteNotice = async (id: string) => {
+    try { await autoNoticeApi.delete(id); setNotices((n) => n.filter((x) => x.id !== id)) }
+    catch { addToast({ type: 'error', title: '자동 공지 삭제 실패' }) }
+  }
+
+  const handleToggleNotice = async (notice: AutoNotice) => {
+    try {
+      await autoNoticeApi.update(notice.id, { ...notice, enabled: !notice.enabled })
+      setNotices((ns) => ns.map((n) => n.id === notice.id ? { ...n, enabled: !n.enabled } : n))
+    } catch { addToast({ type: 'error', title: '자동 공지 업데이트 실패' }) }
+  }
+
+  const startEditNotice = (n: AutoNotice) => {
+    setShowAddNotice(false)
+    setEditingNoticeId(n.id)
+    setNoticeForm({ message: n.message, intervalMinutes: n.intervalMinutes })
   }
 
   const handleAddCommand = async () => {
@@ -109,47 +146,10 @@ export default function BotPage() {
   }
 
   return (
-    <div className="flex h-screen bg-bg-outer overflow-hidden gap-3 p-3">
+    <div className="flex h-full bg-bg-outer overflow-hidden gap-3 p-3">
 
       {/* ── 왼쪽: 봇 설정 패널 ── */}
       <div className="w-72 shrink-0 flex flex-col gap-3">
-
-        {/* 봇 아이덴티티 카드 */}
-        <div className="bg-bg-card border border-border rounded-2xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-8 h-8 rounded-xl bg-accent-mint/15 border border-accent-mint/30 flex items-center justify-center">
-              <Bot size={15} className="text-accent-mint" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-text-primary">봇 이름</p>
-              <p className="text-xs text-text-muted">앱 내 표시 이름</p>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <input
-              className="w-full bg-bg-input border border-border rounded-xl px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-mint focus:ring-1 focus:ring-accent-mint/20 transition-colors"
-              placeholder="예: 방송봇, MyBot..."
-              value={botName}
-              onChange={(e) => setBotName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSaveBotName()}
-              maxLength={20}
-            />
-            <button
-              onClick={handleSaveBotName}
-              disabled={nameSaving || !botName.trim()}
-              className="w-full flex items-center justify-center gap-1.5 py-2 text-sm font-medium bg-accent-mint text-bg-outer rounded-xl hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-            >
-              {botNameSaved ? <><Check size={13} /> 저장됨</> : '저장'}
-            </button>
-          </div>
-
-          {botName && (
-            <p className="text-xs text-text-muted mt-2.5 pt-2.5 border-t border-border">
-              현재: <span className="text-accent-mint font-semibold">{botName}</span>
-            </p>
-          )}
-        </div>
 
         {/* 통계 카드 */}
         <div className="bg-bg-card border border-border rounded-2xl p-4">
@@ -166,7 +166,7 @@ export default function BotPage() {
           </div>
         </div>
 
-        {/* 사용법 안내 */}
+        {/* 사용 방법 */}
         <div className="bg-bg-card border border-border rounded-2xl p-4 flex-1">
           <p className="text-xs font-semibold text-text-secondary mb-2">사용 방법</p>
           <ul className="space-y-2 text-xs text-text-muted leading-relaxed">
@@ -192,8 +192,11 @@ export default function BotPage() {
 
       </div>
 
-      {/* ── 오른쪽: 명령어 목록 ── */}
-      <div className="flex-1 flex flex-col min-w-0 bg-bg-card border border-border rounded-2xl overflow-hidden">
+      {/* ── 오른쪽: 명령어 + 자동 공지 ── */}
+      <div className="flex-1 flex flex-col min-w-0 gap-3">
+
+      {/* 봇 명령어 (위) */}
+      <div className="flex-[2] flex flex-col min-h-0 bg-bg-card border border-border rounded-2xl overflow-hidden">
 
         {/* 헤더 */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
@@ -323,7 +326,109 @@ export default function BotPage() {
           )}
         </div>
 
-      </div>
+      </div>{/* end 봇 명령어 카드 */}
+
+      {/* 자동 공지 (아래) */}
+      <div className="flex-1 flex flex-col min-h-0 bg-bg-card border border-border rounded-2xl overflow-hidden">
+
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
+          <div className="flex items-center gap-2">
+            <Bell size={14} className="text-accent-purple" />
+            <span className="text-sm font-semibold text-text-primary">자동 공지</span>
+            {notices.length > 0 && (
+              <span className="text-xs text-text-muted bg-bg-outer border border-border rounded-full px-2 py-0.5">{notices.length}</span>
+            )}
+          </div>
+          {!showAddNotice && !editingNoticeId && (
+            <button
+              onClick={() => setShowAddNotice(true)}
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium bg-accent-purple/15 border border-accent-purple/30 text-accent-purple rounded-lg hover:bg-accent-purple/25 transition-colors"
+            >
+              <Plus size={11} /> 추가
+            </button>
+          )}
+        </div>
+
+        {/* 추가 / 수정 폼 */}
+        {(showAddNotice || editingNoticeId) && (
+          <div className="px-3 py-3 border-b border-border bg-bg-outer/60 shrink-0 space-y-2">
+            <textarea
+              rows={2}
+              className="w-full bg-bg-card border border-border rounded-xl px-3 py-2 text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-purple resize-none transition-colors"
+              placeholder="공지 메시지..."
+              value={noticeForm.message}
+              onChange={(e) => setNoticeForm((p) => ({ ...p, message: e.target.value }))}
+            />
+            <div className="flex items-center gap-2">
+              <Clock size={12} className="text-text-muted shrink-0" />
+              <input
+                type="number" min={1}
+                className="w-16 bg-bg-card border border-border rounded-lg px-2 py-1.5 text-xs text-text-primary focus:outline-none focus:border-accent-purple text-center"
+                value={noticeForm.intervalMinutes}
+                onChange={(e) => setNoticeForm((p) => ({ ...p, intervalMinutes: Number(e.target.value) }))}
+              />
+              <span className="text-xs text-text-muted">분마다 전송</span>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={editingNoticeId ? handleSaveNotice : handleAddNotice}
+                className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs bg-accent-purple text-white rounded-lg font-medium hover:brightness-110 transition-colors"
+              >
+                <Check size={11} /> {editingNoticeId ? '저장' : '추가'}
+              </button>
+              <button
+                onClick={() => { setShowAddNotice(false); setEditingNoticeId(null); setNoticeForm({ message: '', intervalMinutes: 10 }) }}
+                className="px-3 py-1.5 text-xs border border-border text-text-secondary hover:text-text-primary rounded-lg transition-colors"
+              >
+                <X size={11} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 목록 */}
+        <div className="flex-1 overflow-y-auto">
+          {notices.length === 0 && !showAddNotice ? (
+            <div className="flex flex-col items-center justify-center h-full text-center px-4 pb-6">
+              <Bell size={22} className="text-border mb-2" />
+              <p className="text-xs text-text-muted">등록된 자동 공지가 없습니다</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-border">
+              {notices.map((n) =>
+                editingNoticeId === n.id ? null : (
+                  <div key={n.id} className={`px-4 py-2.5 hover:bg-white/2 transition-colors ${!n.enabled ? 'opacity-50' : ''}`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs text-text-secondary flex-1 min-w-0 truncate">{n.message}</p>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="flex items-center gap-1 text-xs text-text-muted">
+                          <Clock size={10} />
+                          <span>{n.intervalMinutes}분</span>
+                        </div>
+                        <button
+                          onClick={() => handleToggleNotice(n)}
+                          className={`w-8 h-4 rounded-full transition-colors relative ${n.enabled ? 'bg-accent-purple' : 'bg-border'}`}
+                        >
+                          <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-all ${n.enabled ? 'left-4' : 'left-0.5'}`} />
+                        </button>
+                        <button onClick={() => startEditNotice(n)} className="p-1 text-text-muted hover:text-text-secondary hover:bg-white/5 rounded-md transition-colors">
+                          <Pencil size={11} />
+                        </button>
+                        <button onClick={() => handleDeleteNotice(n.id)} className="p-1 text-text-muted hover:text-red-400 hover:bg-red-400/10 rounded-md transition-colors">
+                          <Trash2 size={11} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              )}
+            </div>
+          )}
+        </div>
+
+      </div>{/* end 자동 공지 카드 */}
+
+      </div>{/* end 오른쪽 래퍼 */}
     </div>
   )
 }

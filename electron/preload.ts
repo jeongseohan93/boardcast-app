@@ -56,4 +56,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // ── 네트워크 ──────────────────────────────────────────────────────────────
   // Windows 방화벽에 포트 3001 인바운드 허용 규칙 추가 (송출컴 접근용)
   addFirewallRule: () => ipcRenderer.invoke('add-firewall-rule') as Promise<{ ok: boolean; error?: string }>,
+
+  // ── 창 컨트롤 (커스텀 타이틀바) ─────────────────────────────────────────
+  windowMinimize: () => ipcRenderer.invoke('window-minimize'),
+  windowMaximize: () => ipcRenderer.invoke('window-maximize'),
+  windowClose: () => ipcRenderer.invoke('window-close'),
+  windowIsMaximized: () => ipcRenderer.invoke('window-is-maximized') as Promise<boolean>,
+  onWindowMaximizeChange: (callback: (maximized: boolean) => void) => {
+    ipcRenderer.on('window-maximized', (_e, v: boolean) => callback(v))
+  },
 })

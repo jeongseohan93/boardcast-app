@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>이모티콘 오버레이</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body {
+  background: transparent;
+  overflow: hidden;
+  width: 100vw; height: 100vh;
+  pointer-events: none;
+}
+.particle {
+  position: fixed;
+  pointer-events: none;
+  user-select: none;
+  transform-origin: center center;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.particle img {
+  display: block;
+  object-fit: contain;
+}
+body[data-theme="2"] .particle {
+  filter: drop-shadow(0 0 8px #f472b6) drop-shadow(0 0 16px #60a5fa);
+}
+body[data-theme="3"] .particle {
+  border-radius: 999px;
+  background: rgba(255,255,255,.16);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.25), 0 8px 18px rgba(0,0,0,.22);
+}
+body[data-theme="3"] .particle img {
+  padding: 5px;
+}
+body[data-theme="4"] .particle {
+  filter: drop-shadow(2px 0 0 #fff) drop-shadow(-2px 0 0 #fff) drop-shadow(0 2px 0 #fff) drop-shadow(0 -2px 0 #fff) drop-shadow(0 8px 10px rgba(0,0,0,.35));
+}
+body[data-theme="5"] .particle {
+  image-rendering: pixelated;
+  filter: contrast(1.18) saturate(1.25);
+}
+body[data-theme="5"] .particle img {
+  image-rendering: pixelated;
+}
+</style>
+</head>
+<body>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const params = new URLSearchParams(location.search)
+const THEME = Math.min(Math.max(parseInt(params.get('theme') || '1', 10), 1), 5)
+const GRAVITY = Math.min(Math.max(parseInt(params.get('gravity') || '900', 10), 200), 1800)
+const MAX_PARTS = Math.min(Math.max(parseInt(params.get('maxParts') || '90', 10), 20), 220)
+const PARTICLE_SIZE = Math.min(Math.max(parseInt(params.get('size') || '42', 10), 24), 96)
+const SPREAD = Math.min(Math.max(parseFloat(params.get('spread') || '1'), 0.5), 1.8)
+
+document.body.dataset.theme = String(THEME)
+
+let particles = []
+let rafId     = null
+let lastTime  = null
+
+function tick(now) {
+  if (!lastTime) lastTime = now
+  const dt = Math.min((now - lastTime) / 1000, 0.05)
+  lastTime = now
+
+  const alive = []
+  for (const p of particles) {
+    p.vy  += GRAVITY * dt
+    p.x   += p.vx * dt
+    p.y   += p.vy * dt
+    p.rot += p.rotSpeed * dt
+    p.life -= dt
+
+    const t     = 1 - p.life / p.maxLife
+    const alpha = t < 0.6 ? 1 : 1 - (t - 0.6) / 0.4
+    const scale = t < 0.1 ? t / 0.1 : 1
+
+    p.el.style.transform = `translate(${p.x}px, ${p.y}px) rotate(${p.rot}deg) scale(${scale})`
+    p.el.style.opacity   = alpha
+
+    if (p.life > 0) {
+      alive.push(p)
+    } else {
+      p.el.remove()
+    }
+  }
+
+  particles = alive
+  if (particles.length > 0) {
+    rafId = requestAnimationFrame(tick)
+  } else {
+    rafId     = null
+    lastTime  = null
+  }
+}
+
+function ensureLoop() {
+  if (!rafId) {
+    lastTime = null
+    rafId = requestAnimationFrame(tick)
+  }
+}
+
+function spawnBurst(items, originX, originY) {
+  if (!items.length) return
+
+  // 이모지 1~2개여도 최소 12개 파티클 보장 (팡 터지는 효과)
+  const MIN_BURST = 12
+  const repeat = Math.ceil(MIN_BURST / items.length)
+  const pool = []
+  for (let r = 0; r < repeat; r++) {
+    for (const item of items) pool.push(item)
+  }
+
+  // 사용 가능한 슬롯 계산 (오래된 파티클 밀어내기)
+  const want = Math.min(pool.length, MAX_PARTS)
+  if (particles.length + want > MAX_PARTS) {
+    const excess = particles.length + want - MAX_PARTS
+    for (let i = 0; i < excess; i++) {
+      const old = particles.shift()
+      if (old) old.el.remove()
+    }
+  }
+
+  const toSpawn = pool.slice(0, want)
+  const size = PARTICLE_SIZE
+
+  for (let i = 0; i < toSpawn.length; i++) {
+    const item  = toSpawn[i]
+    // 균등하게 360도 분산 + 약간의 랜덤 흔들림
+    const angle = (Math.PI * 2 * i / toSpawn.length) + (Math.random() - 0.5) * 0.6
+    // 속도에 약간의 변화를 주어 자연스럽게
+    const speed = (300 + Math.random() * 450) * SPREAD
+
+    const el = document.createElement('div')
+    el.className = 'particle'
+    el.style.width    = size + 'px'
+    el.style.height   = size + 'px'
+    el.style.fontSize = size + 'px'
+    el.style.left = '0'
+    el.style.top  = '0'
+    el.style.willChange = 'transform, opacity'
+
+    if (item.type === 'img') {
+      const img = document.createElement('img')
+      img.src    = item.url
+      img.width  = size
+      img.height = size
+      el.appendChild(img)
+    } else {
+      el.textContent = item.char
+    }
+
+    document.body.appendChild(el)
+
+    const maxLife = (1.2 + Math.random() * 1.0) * (THEME === 2 ? 1.15 : 1)
+
+    particles.push({
+      el,
+      x: originX - size / 2,
+      y: originY - size / 2,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 80,   // 초기 위쪽 편향으로 더 자연스럽게
+      rot: Math.random() * 360,
+      rotSpeed: (Math.random() - 0.5) * 900,
+      life: maxLife,
+      maxLife,
+    })
+  }
+
+  ensureLoop()
+}
+
+const EMOJI_RE = /\p{Emoji_Presentation}|\p{Extended_Pictographic}/gu
+
+function escapeRegExp(text) {
+  return String(text).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function findImageUrl(value, depth = 0) {
+  if (depth > 5 || value == null) return ''
+  if (typeof value === 'string') return /^https?:\/\//i.test(value) ? value : ''
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findImageUrl(item, depth + 1)
+      if (found) return found
+    }
+    return ''
+  }
+  if (typeof value !== 'object') return ''
+
+  const entries = Object.entries(value)
+  const priority = entries.filter(([key]) => /url|image|icon|emote|emoji/i.test(key))
+  for (const [, nested] of priority) {
+    const found = findImageUrl(nested, depth + 1)
+    if (found) return found
+  }
+  for (const [, nested] of entries) {
+    const found = findImageUrl(nested, depth + 1)
+    if (found) return found
+  }
+  return ''
+}
+
+function proxyImageUrl(url) {
+  if (!/^https?:\/\//i.test(url)) return url
+  return `/api/proxy/image?url=${encodeURIComponent(url)}`
+}
+
+function getEmojiUrl(emojis, key) {
+  const map = emojis || {}
+  const candidates = [
+    key,
+    String(key).trim(),
+    String(key).replace(/^:/, '').replace(/:$/, ''),
+  ]
+
+  for (const candidate of candidates) {
+    if (Object.prototype.hasOwnProperty.call(map, candidate)) {
+      return findImageUrl(map[candidate])
+    }
+  }
+  return ''
+}
+
+function countOccurrences(message, key) {
+  if (!key) return 1
+  const patterns = [
+    new RegExp(`\\{:${escapeRegExp(key)}:\\}`, 'g'),
+    new RegExp(`:${escapeRegExp(key)}:`, 'g'),
+  ]
+  const count = patterns.reduce((sum, re) => sum + ((message.match(re) || []).length), 0)
+  return Math.max(count, 1)
+}
+
+function extractChzzkEmotes(message, emojis) {
+  const items = []
+  const usedKeys = new Set()
+  const chzzkRe = /\{:([^}]+):\}/g
+  let m
+  while ((m = chzzkRe.exec(message)) !== null) {
+    const key = m[1]
+    const url = getEmojiUrl(emojis, key)
+    if (url) {
+      usedKeys.add(key)
+      items.push({ type: 'img', url: proxyImageUrl(url) })
+    }
+  }
+
+  for (const [key, value] of Object.entries(emojis || {})) {
+    if (usedKeys.has(key)) continue
+    const url = findImageUrl(value)
+    if (!url) continue
+
+    const count = countOccurrences(message, key)
+    for (let i = 0; i < count; i++) {
+      items.push({ type: 'img', url: proxyImageUrl(url) })
+    }
+  }
+
+  return items
+}
+
+function extractEmotes(message, emojis) {
+  const items = extractChzzkEmotes(message, emojis)
+  const textOnly = message.replace(/\{:[^}]+:\}/g, '')
+  const matches  = textOnly.match(EMOJI_RE) || []
+  for (const ch of matches) {
+    if (ch.charCodeAt(0) > 0x200) {          // 제어문자·변형선택자 제외
+      items.push({ type: 'text', char: ch })
+    }
+  }
+  return items
+}
+
+function normalizeIncomingItems(value) {
+  if (!Array.isArray(value)) return []
+  const items = []
+  for (const item of value) {
+    const url = findImageUrl(item && typeof item === 'object' ? item.url : item)
+    if (url) items.push({ type: 'img', url: proxyImageUrl(url) })
+  }
+  return items
+}
+
+function handleChat(d) {
+  const directItems = normalizeIncomingItems(d.emojiItems)
+  const items = directItems.length ? directItems : extractEmotes(d.message || '', d.emojis || {})
+  if (!items.length) return
+
+  const cx = window.innerWidth  * (0.25 + Math.random() * 0.5)
+  const cy = window.innerHeight * (0.35 + Math.random() * 0.35)
+  spawnBurst(items, cx, cy)
+}
+
+const socket = io({ transports: ['websocket', 'polling'] })
+socket.on('chat', handleChat)
+socket.on('connect',    () => console.log('[emote-overlay] connected'))
+socket.on('disconnect', () => console.log('[emote-overlay] disconnected'))
+</script>
+</body>
+</html>

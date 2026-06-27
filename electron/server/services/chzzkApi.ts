@@ -172,3 +172,73 @@ export async function removeTemporaryRestriction(
   const res = await client.delete('/open/v1/temporary-restrict-channels', { data })
   return res.data
 }
+
+export async function getChatSettings(accessToken: string) {
+  const client = createChzzkClient(accessToken)
+  const res = await client.get('/open/v1/chats/settings')
+  return res.data.content
+}
+
+export async function updateChatSettings(
+  accessToken: string,
+  data: {
+    chatAvailableCondition?: string
+    chatAvailableGroup?: string
+    minFollowerMinute?: number
+    allowSubscriberInFollowerMode?: boolean
+    chatSlowModeSec?: number
+    chatEmojiMode?: boolean
+  }
+) {
+  const client = createChzzkClient(accessToken)
+  const res = await client.put('/open/v1/chats/settings', data)
+  return res.data.content
+}
+
+export async function getStreamingRoles(accessToken: string) {
+  const client = createChzzkClient(accessToken)
+  const res = await client.get('/open/v1/channels/streaming-roles')
+  return (res.data.content?.data ?? []) as unknown[]
+}
+
+export async function getChannelFollowers(
+  accessToken: string,
+  params?: { page?: number; size?: number }
+) {
+  const client = createChzzkClient(accessToken)
+  const res = await client.get('/open/v1/channels/followers', { params })
+  return res.data.content
+}
+
+export async function getChannelSubscribers(
+  accessToken: string,
+  params?: { page?: number; size?: number; sort?: string }
+) {
+  const client = createChzzkClient(accessToken)
+  const res = await client.get('/open/v1/channels/subscribers', { params })
+  return res.data.content
+}
+
+export async function getLiveList(
+  clientId: string,
+  clientSecret: string,
+  params?: { size?: number; next?: string }
+) {
+  const client = createChzzkClient(undefined, clientId, clientSecret)
+  const res = await client.get('/open/v1/lives', { params })
+  return res.data.content
+}
+
+export async function revokeToken(
+  clientId: string,
+  clientSecret: string,
+  token: string,
+  tokenTypeHint?: 'access_token' | 'refresh_token'
+) {
+  const res = await axios.post(
+    'https://chzzk.naver.com/auth/v1/token/revoke',
+    { clientId, clientSecret, token, ...(tokenTypeHint ? { tokenTypeHint } : {}) },
+    { headers: { 'Content-Type': 'application/json' } }
+  )
+  return res.data
+}

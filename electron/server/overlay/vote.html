@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>투표 오버레이</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:transparent; font-family:'Malgun Gothic','Segoe UI',sans-serif; overflow:hidden; }
+
+#wrap {
+  position:fixed;
+  bottom:30px;
+  left:30px;
+  width:340px;
+  pointer-events:none;
+  transition:opacity .4s ease, transform .4s ease;
+}
+#wrap.hidden { opacity:0; transform:translateY(16px); }
+#wrap.visible { opacity:1; transform:translateY(0); }
+
+.card {
+  background:linear-gradient(135deg,#0d0f14f0,#1a1c23f0);
+  border:1px solid rgba(255,255,255,.1);
+  border-radius:16px;
+  padding:16px 18px;
+  box-shadow:0 8px 40px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.04);
+}
+
+.header {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-bottom:14px;
+}
+.badge {
+  font-size:10px;
+  font-weight:700;
+  padding:2px 8px;
+  border-radius:99px;
+  letter-spacing:.04em;
+  flex-shrink:0;
+}
+.badge.active { background:#00FFA320; color:#00FFA3; border:1px solid #00FFA360; }
+.badge.ended  { background:rgba(255,255,255,.08); color:#888; border:1px solid rgba(255,255,255,.12); }
+.title {
+  font-size:13px;
+  font-weight:700;
+  color:#fff;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  flex:1;
+}
+
+.options { display:flex; flex-direction:column; gap:10px; }
+.opt { }
+.opt-row {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:4px;
+}
+.opt-left { display:flex; align-items:center; gap:6px; }
+.opt-num {
+  width:18px; height:18px;
+  border-radius:50%;
+  font-size:10px;
+  font-weight:800;
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0;
+}
+.opt-label {
+  font-size:12px;
+  color:#ddd;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  max-width:180px;
+}
+.opt-label.winner { color:#00FFA3; font-weight:700; }
+.opt-stats {
+  font-size:11px;
+  font-weight:700;
+  flex-shrink:0;
+}
+.track {
+  height:5px;
+  background:rgba(255,255,255,.08);
+  border-radius:99px;
+  overflow:hidden;
+}
+.fill {
+  height:100%;
+  border-radius:99px;
+  transition:width .6s cubic-bezier(.25,.46,.45,.94);
+}
+
+.footer {
+  margin-top:12px;
+  font-size:10px;
+  color:#666;
+}
+.footer span { color:#00FFA3; }
+</style>
+</head>
+<body>
+<div id="wrap" class="hidden">
+  <div class="card">
+    <div class="header">
+      <span id="badge" class="badge active">진행 중</span>
+      <span id="title" class="title"></span>
+    </div>
+    <div id="opts" class="options"></div>
+    <div id="footer" class="footer"></div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const COLORS = ['#00FFA3','#A78BFA','#FFD166','#F472B6','#60A5FA','#34D399','#FB923C','#E879F9']
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') }
+
+const wrap   = document.getElementById('wrap')
+const badge  = document.getElementById('badge')
+const titleEl = document.getElementById('title')
+const optsEl = document.getElementById('opts')
+const footerEl= document.getElementById('footer')
+
+function render(poll) {
+  if (!poll || poll.status === 'idle') {
+    wrap.className = 'hidden'
+    return
+  }
+
+  const total = poll.options.reduce((s, o) => s + o.votes, 0)
+  const maxV  = Math.max(...poll.options.map(o => o.votes), 1)
+
+  badge.textContent = poll.status === 'active' ? '진행 중' : '종료'
+  badge.className   = 'badge ' + poll.status
+  titleEl.textContent = poll.title
+
+  optsEl.innerHTML = poll.options.map((opt, i) => {
+    const pct = total > 0 ? Math.round(opt.votes / total * 100) : 0
+    const color = COLORS[i % COLORS.length]
+    const isWinner = poll.status === 'ended' && opt.votes === maxV && total > 0
+    return `
+      <div class="opt">
+        <div class="opt-row">
+          <div class="opt-left">
+            <div class="opt-num" style="background:${color}28;color:${color}">${i+1}</div>
+            <span class="opt-label${isWinner ? ' winner' : ''}">${esc(opt.label)}${isWinner ? ' 🏆' : ''}</span>
+          </div>
+          <span class="opt-stats" style="color:${color}">${pct}% <span style="color:#666;font-weight:400">${opt.votes}</span></span>
+        </div>
+        <div class="track">
+          <div class="fill" id="fill${i}" style="width:0%;background:${color}"></div>
+        </div>
+      </div>`
+  }).join('')
+
+  // 다음 프레임에서 bar 애니메이션 (width:0 → 실제값 transition)
+  requestAnimationFrame(() => {
+    poll.options.forEach((opt, i) => {
+      const pct = total > 0 ? Math.round(opt.votes / total * 100) : 0
+      const el = document.getElementById('fill' + i)
+      if (el) el.style.width = pct + '%'
+    })
+  })
+
+  footerEl.textContent = poll.status === 'active'
+    ? `총 ${total}표 · 채팅에서 번호를 입력하세요`
+    : `최종 결과 · 총 ${total}표`
+
+  wrap.className = 'visible'
+}
+
+// 초기 상태 로드
+fetch('/api/voting')
+  .then(r => r.json()).then(render).catch(() => {})
+
+// 실시간 업데이트
+const socket = io()
+socket.on('pollUpdate', render)
+</script>
+</body>
+</html>

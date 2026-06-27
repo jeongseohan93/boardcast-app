@@ -6,9 +6,9 @@
   "scripts": {
     "predev": "tsc -p tsconfig.electron.json",
     "dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && cross-env NODE_ENV=development node scripts/launch-electron.js\" ",
-    "build": "vite build && tsc -p tsconfig.electron.json && electron-builder",
+    "build": "vite build && npm run build:electron && electron-builder",
     "build:vite": "vite build",
-    "build:electron": "tsc -p tsconfig.electron.json",
+    "build:electron": "tsc -p tsconfig.electron.json && node scripts/copy-overlays.js",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "setup": "npm install --ignore-scripts && electron-rebuild -f -w better-sqlite3"
@@ -24,6 +24,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.1",
+    "recharts": "^3.9.0",
     "socket.io": "^4.7.4",
     "socket.io-client": "^4.7.4",
     "socket.io-client-v2": "npm:socket.io-client@^2.5.0",

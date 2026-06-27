@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>영상 후원</title>
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
+body {
+  width:100vw;
+  height:100vh;
+  overflow:hidden;
+  background:transparent;
+  font-family:'Malgun Gothic','Segoe UI',sans-serif;
+}
+#wrap {
+  position:fixed;
+  left:50%;
+  top:50%;
+  width:min(1280px, 88vw);
+  aspect-ratio:16/9;
+  transform:translate(-50%,-50%) scale(.96);
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .22s ease, transform .22s ease;
+}
+#wrap.on {
+  opacity:1;
+  transform:translate(-50%,-50%) scale(1);
+}
+#player {
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  border:0;
+  border-radius:18px;
+  overflow:hidden;
+  background:#000;
+  box-shadow:0 24px 90px rgba(0,0,0,.75), 0 0 0 1px rgba(255,255,255,.12);
+}
+#meta {
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:100%;
+  margin-bottom:12px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  color:#fff;
+  text-shadow:0 2px 8px rgba(0,0,0,.85);
+}
+#badge {
+  flex-shrink:0;
+  padding:7px 10px;
+  border-radius:10px;
+  background:rgba(0,255,163,.16);
+  border:1px solid rgba(0,255,163,.35);
+  color:#00ffa3;
+  font-size:12px;
+  font-weight:900;
+}
+#title {
+  min-width:0;
+  padding:8px 12px;
+  border-radius:12px;
+  background:rgba(8,10,14,.72);
+  border:1px solid rgba(255,255,255,.12);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  font-size:16px;
+  font-weight:800;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="meta">
+    <div id="badge">VIDEO</div>
+    <div id="title"></div>
+  </div>
+  <iframe id="player" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+</div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const p = new URLSearchParams(location.search)
+const preview = p.get('preview') === '1'
+const wrap = document.getElementById('wrap')
+const player = document.getElementById('player')
+const title = document.getElementById('title')
+let stopTimer = null
+
+const socket = io()
+socket.on('videoDonation:play', play)
+socket.on('videoDonation:stop', stop)
+
+function play(item) {
+  if (!item || !item.videoId) return
+  clearTimeout(stopTimer)
+  const maxSeconds = Math.max(5, Number(item.maxSeconds || 90))
+  title.textContent = `${item.nickname || '시청자'} · ${Number(item.amount || 0).toLocaleString()} 치즈`
+  player.src = `https://www.youtube.com/embed/${encodeURIComponent(item.videoId)}?autoplay=1&rel=0&modestbranding=1&playsinline=1`
+  wrap.classList.add('on')
+  stopTimer = setTimeout(stop, maxSeconds * 1000)
+}
+
+function stop() {
+  clearTimeout(stopTimer)
+  stopTimer = null
+  wrap.classList.remove('on')
+  setTimeout(() => { player.src = 'about:blank' }, 260)
+}
+
+if (preview) {
+  setTimeout(() => play({
+    nickname: '테스트유저',
+    amount: 1000,
+    videoId: 'dQw4w9WgXcQ',
+    maxSeconds: 15,
+  }), 500)
+}
+</script>
+</body>
+</html>

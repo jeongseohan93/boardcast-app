@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
-import { ExternalLink, LogOut, Trash2, AlertTriangle, Settings, User } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { ExternalLink, LogOut, Trash2, AlertTriangle, Settings, User, Palette, Database, Download, Upload, Wrench } from 'lucide-react'
 import { authApi, eventsApi } from '../api/client'
 import { useAuthStore } from '../store/authStore'
 import { useToastStore } from '../store/toastStore'
+import { APP_THEMES, AppTheme, applyAppTheme, getStoredAppTheme } from '../utils/appTheme'
 
 export default function SettingsPage() {
   const { isAuthenticated, channelName, channelImageUrl, followerCount, checkAuth, logout } = useAuthStore()
@@ -12,8 +13,11 @@ export default function SettingsPage() {
   const [clientSecret, setClientSecret] = useState('')
   const [saving, setSaving]         = useState(false)
   const [version, setVersion]       = useState('')
+  const [theme, setTheme]           = useState<AppTheme>(() => getStoredAppTheme())
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleting, setDeleting]     = useState(false)
+  const [dbBusy, setDbBusy]         = useState('')
+const importInputRef              = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -58,8 +62,71 @@ export default function SettingsPage() {
     finally { setDeleting(false) }
   }
 
+  const handleCleanupDb = async () => {
+    if (!confirm('다시 팔로우한 사용자의 기존 팔로우 취소 기록을 정리할까요?')) return
+    setDbBusy('cleanup')
+    try {
+      const res = await eventsApi.cleanupReconciledUnfollows()
+      addToast({ type: 'info', title: `DB 정리 완료: ${res.data.deleted ?? 0}건 삭제` })
+    } catch {
+      addToast({ type: 'error', title: 'DB 정리 실패' })
+    } finally {
+      setDbBusy('')
+    }
+  }
+
+  const handleExportDb = async () => {
+    setDbBusy('export')
+    try {
+      const res = await eventsApi.exportDb()
+      const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+      a.href = url
+      a.download = `broadcast-assistant-db-${stamp}.json`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      addToast({ type: 'info', title: 'DB 내보내기 완료' })
+    } catch {
+      addToast({ type: 'error', title: 'DB 내보내기 실패' })
+    } finally {
+      setDbBusy('')
+    }
+  }
+
+  const handleImportDb = async (file?: File) => {
+    if (!file) return
+    if (!confirm('가져온 DB로 현재 이벤트 DB를 교체합니다. 계속할까요?')) {
+      if (importInputRef.current) importInputRef.current.value = ''
+      return
+    }
+    setDbBusy('import')
+    try {
+      const text = await file.text()
+      const payload = JSON.parse(text)
+      const res = await eventsApi.importDb(payload)
+      const imported = res.data.imported ?? {}
+      const total = Object.values(imported).reduce((sum: number, value) => sum + Number(value || 0), 0)
+      addToast({ type: 'info', title: `DB 가져오기 완료: ${total.toLocaleString()}건` })
+    } catch {
+      addToast({ type: 'error', title: 'DB 가져오기 실패' })
+    } finally {
+      setDbBusy('')
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
+  const handleTheme = (nextTheme: AppTheme) => {
+    setTheme(nextTheme)
+    applyAppTheme(nextTheme)
+    addToast({ type: 'info', title: `${APP_THEMES[nextTheme].label} 테마를 적용했습니다` })
+  }
+
   return (
-    <div className="flex flex-col h-screen bg-bg-outer overflow-hidden">
+    <div className="flex flex-col h-full bg-bg-outer overflow-hidden">
       {/* 헤더 */}
       <div className="flex items-center gap-3 px-5 py-4 border-b border-border shrink-0">
         <Settings size={18} className="text-accent-mint" />
@@ -67,7 +134,8 @@ export default function SettingsPage() {
         {version && <span className="ml-auto text-xs text-text-muted">v{version}</span>}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 max-w-2xl">
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="max-w-2xl mx-auto space-y-4">
 
         {/* 계정 정보 */}
         {isAuthenticated && (
@@ -97,6 +165,44 @@ export default function SettingsPage() {
             </div>
           </div>
         )}
+
+<div className="bg-bg-card border border-border rounded-2xl overflow-hidden">
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+            <Palette size={13} className="text-accent-mint" />
+            <span className="text-sm font-semibold text-text-primary">프로그램 테마</span>
+          </div>
+          <div className="p-4">
+            <div className="grid grid-cols-2 gap-2">
+              {(Object.entries(APP_THEMES) as [AppTheme, typeof APP_THEMES.midnight][]).map(([key, item]) => {
+                const selected = theme === key
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => handleTheme(key)}
+                    className={`text-left rounded-xl border p-3 transition-all ${
+                      selected
+                        ? 'border-accent-mint bg-accent-mint/10'
+                        : 'border-border bg-bg-outer hover:border-accent-mint/40'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 mb-2">
+                      {item.swatches.map((color) => (
+                        <span
+                          key={color}
+                          className="w-5 h-5 rounded-full border border-white/20"
+                          style={{ background: color }}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-sm font-semibold text-text-primary">{item.label}</p>
+                    <p className="text-xs text-text-muted mt-0.5">{item.description}</p>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>
 
         {/* API 키 설정 */}
         <div className="bg-bg-card border border-border rounded-2xl overflow-hidden">
@@ -150,27 +256,57 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* 데이터 관리 */}
         <div className="bg-bg-card border border-border rounded-2xl overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
-            <span className="text-sm font-semibold text-text-primary">데이터 관리</span>
+            <Database size={13} className="text-accent-mint" />
+            <span className="text-sm font-semibold text-text-primary">DB 백업/복원</span>
           </div>
           <div className="p-4">
             <p className="text-xs text-text-secondary mb-3">
-              저장된 후원, 구독, 팔로우 이벤트 데이터를 영구적으로 삭제합니다.
+              후원, 구독, 팔로우 이벤트와 현재 팔로워 목록을 정리하거나 JSON 파일로 백업/복원합니다.
             </p>
-            <button
-              onClick={() => setShowDeleteModal(true)}
-              className="flex items-center gap-2 px-3 py-2 text-xs text-red-400 border border-red-400/30 hover:bg-red-400/10 rounded-xl transition-colors"
-            >
-              <Trash2 size={12} /> 이벤트 데이터 전체 초기화
-            </button>
+            <input
+              ref={importInputRef}
+              type="file"
+              accept="application/json,.json"
+              className="hidden"
+              onChange={(e) => void handleImportDb(e.target.files?.[0])}
+            />
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={handleCleanupDb}
+                disabled={!!dbBusy}
+                className="flex items-center justify-center gap-2 px-3 py-2 text-xs text-accent-mint border border-accent-mint/30 hover:bg-accent-mint/10 rounded-xl transition-colors disabled:opacity-50"
+              >
+                <Wrench size={12} /> 팔로우 DB 정리
+              </button>
+              <button
+                onClick={handleExportDb}
+                disabled={!!dbBusy}
+                className="flex items-center justify-center gap-2 px-3 py-2 text-xs text-text-secondary border border-border hover:border-accent-mint/40 hover:text-text-primary rounded-xl transition-colors disabled:opacity-50"
+              >
+                <Download size={12} /> DB 내보내기
+              </button>
+              <button
+                onClick={() => importInputRef.current?.click()}
+                disabled={!!dbBusy}
+                className="flex items-center justify-center gap-2 px-3 py-2 text-xs text-text-secondary border border-border hover:border-accent-mint/40 hover:text-text-primary rounded-xl transition-colors disabled:opacity-50"
+              >
+                <Upload size={12} /> DB 가져오기
+              </button>
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                disabled={!!dbBusy}
+                className="flex items-center justify-center gap-2 px-3 py-2 text-xs text-red-400 border border-red-400/30 hover:bg-red-400/10 rounded-xl transition-colors disabled:opacity-50"
+              >
+                <Trash2 size={12} /> 전체 초기화
+              </button>
+            </div>
           </div>
         </div>
 
+        </div>
       </div>
-
-      {/* 삭제 확인 모달 */}
       {showDeleteModal && (
         <div
           className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"

@@ -2,7 +2,7 @@ import { Router } from 'express'
 import axios from 'axios'
 import Store from 'electron-store'
 import { safeStorage } from 'electron'
-import { getMyChannel, getChannelInfo } from '../services/chzzkApi'
+import { getMyChannel, getChannelInfo, revokeToken } from '../services/chzzkApi'
 import { chzzkSession, initChzzkSession, stopChzzkSession, initPollService, stopPollService } from '../index'
 
 const router = Router()
@@ -76,7 +76,7 @@ router.post('/token', async (req, res) => {
 
     if (!accessToken) {
       console.error('[Auth] access_token not found. Full response:', tokenRes.data)
-      return res.status(500).json({ error: 'access_token not found in CHZZK response', raw: tokenRes.data })
+      return res.status(500).json({ error: 'access_token not found in CHZZK response' })
     }
 
     // getMyChannel 성공 확인 후 저장 — 실패 시 반쪽 인증 상태 방지
@@ -182,9 +182,22 @@ router.get('/status', async (_req, res) => {
   })
 })
 
-router.post('/logout', (_req, res) => {
+router.post('/logout', async (_req, res) => {
+  const accessToken = secureGet('accessToken')
+  const clientId = secureGet('clientId')
+  const clientSecret = secureGet('clientSecret')
+
   stopChzzkSession()
   stopPollService()
+
+  if (accessToken && clientId && clientSecret) {
+    try {
+      await revokeToken(clientId, clientSecret, accessToken, 'access_token')
+    } catch (err) {
+      console.warn('[Auth] Token revoke failed (continuing logout):', axiosDetail(err))
+    }
+  }
+
   secureDel('accessToken')
   secureDel('refreshToken')
   store.delete('tokenExpiresAt' as never)

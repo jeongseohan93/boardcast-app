@@ -13,6 +13,16 @@
     height: 1080px;
   }
 
+  #backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 11, 15, 0.75);
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    z-index: 2;
+  }
+  #backdrop.visible { opacity: 1; }
+
   #container {
     position: fixed;
     inset: 0;
@@ -20,36 +30,27 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 20px;
+    gap: 22px;
     opacity: 0;
-    transform: scale(0.9);
+    transform: scale(0.94);
     transition: opacity 0.5s ease, transform 0.5s ease;
     pointer-events: none;
+    z-index: 5;
   }
-  #container.visible {
-    opacity: 1;
-    transform: scale(1);
-  }
+  #container.visible { opacity: 1; transform: scale(1); }
 
-  /* 어두운 반투명 backdrop */
-  #backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(10, 11, 15, 0.75);
-    opacity: 0;
-    transition: opacity 0.5s ease;
-  }
-  #backdrop.visible { opacity: 1; }
+  #wheel-stage,
+  #slot-stage { display: none; }
+  #container.mode-wheel #wheel-stage { display: block; }
+  #container.mode-slot #slot-stage { display: block; }
 
-  #wheel-wrap {
+  #wheel-stage {
     position: relative;
     width: 520px;
     height: 520px;
     z-index: 10;
   }
-
-  /* 포인터 (왼쪽 중앙) */
-  #pointer {
+  #wheel-pointer {
     position: absolute;
     left: -18px;
     top: 50%;
@@ -62,10 +63,100 @@
     filter: drop-shadow(0 0 8px #00FFA3);
     z-index: 20;
   }
+  #wheel-rotate {
+    position: relative;
+    width: 520px;
+    height: 520px;
+    transform-origin: center center;
+  }
+  #wheel-disc {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    z-index: 1;
+    display: none;
+    pointer-events: none;
+  }
+  #wheel-canvas {
+    position: absolute;
+    inset: 0;
+    display: block;
+    z-index: 2;
+  }
 
-  canvas { display: block; }
+  #slot-stage {
+    position: relative;
+    width: 1100px;
+    height: 150px;
+  }
+  #slot-stage.themed {
+    width: var(--slot-stage-width, 1280px);
+    height: var(--slot-stage-height, 426px);
+    filter: drop-shadow(0 18px 38px rgba(0,0,0,0.45));
+  }
+  #slot-frame {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    opacity: 0;
+    transition: opacity 0.35s ease;
+    pointer-events: none;
+    z-index: 1;
+  }
+  #slot-stage.themed #slot-frame { opacity: 1; }
+  #slot-window {
+    position: absolute;
+    inset: 0;
+    border-radius: 16px;
+    overflow: hidden;
+    z-index: 2;
+  }
+  #slot-stage.themed #slot-window {
+    left: var(--slot-left, 12%);
+    right: var(--slot-right, 12%);
+    top: var(--slot-top, 32%);
+    bottom: var(--slot-bottom, 30%);
+    border-radius: 12px;
+  }
+  #slot-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    border-radius: inherit;
+    box-shadow: 0 0 60px rgba(0,0,0,0.5), 0 0 20px #00FFA320;
+  }
+  #slot-stage.themed #slot-canvas { box-shadow: none; }
+  #slot-ind-top,
+  #slot-ind-bottom {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 14px solid transparent;
+    border-right: 14px solid transparent;
+    filter: drop-shadow(0 0 6px #00FFA3);
+    z-index: 3;
+  }
+  #slot-ind-top {
+    top: -18px;
+    border-top: 22px solid #00FFA3;
+  }
+  #slot-ind-bottom {
+    bottom: -18px;
+    border-bottom: 22px solid #00FFA3;
+  }
+  #slot-stage.themed #slot-ind-top {
+    top: calc(var(--slot-top, 32%) - 24px + var(--slot-ind-top-offset, 0px));
+  }
+  #slot-stage.themed #slot-ind-bottom {
+    bottom: calc(var(--slot-bottom, 30%) - 24px + var(--slot-ind-bottom-offset, 0px));
+  }
 
-  /* 기증자 정보 배너 */
   #donor-info {
     background: linear-gradient(135deg, #1a1c23ee, #252830ee);
     border: 1px solid #00FFA355;
@@ -74,16 +165,19 @@
     text-align: center;
     z-index: 10;
     min-width: 320px;
-    animation: none;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+  }
+  #container.winner-active #donor-info {
+    opacity: 0;
+    transform: translateY(8px);
   }
   #donor-name { color: #00FFA3; font-size: 18px; font-weight: 800; }
   #donor-amount { color: #fff; font-size: 14px; margin-top: 2px; opacity: 0.8; }
   #donor-message { color: #aaa; font-size: 13px; margin-top: 4px; }
 
-  /* 당첨 배너 */
   #winner-banner {
     position: fixed;
-    bottom: 120px;
+    bottom: 100px;
     left: 50%;
     transform: translateX(-50%) translateY(30px);
     opacity: 0;
@@ -96,24 +190,9 @@
     transition: opacity 0.5s ease, transform 0.5s ease;
     box-shadow: 0 0 40px #00FFA340, 0 8px 32px #00000080;
   }
-  #winner-banner.show {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-  }
-  #winner-label {
-    color: #00FFA3;
-    font-size: 14px;
-    font-weight: 700;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    margin-bottom: 6px;
-  }
-  #winner-name {
-    color: #fff;
-    font-size: 40px;
-    font-weight: 900;
-    text-shadow: 0 0 20px #00FFA360;
-  }
+  #winner-banner.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #winner-label { color: #00FFA3; font-size: 14px; font-weight: 700; letter-spacing: 0.1em; margin-bottom: 6px; }
+  #winner-name { color: #fff; font-size: 40px; font-weight: 900; text-shadow: 0 0 20px #00FFA360; }
 
   @keyframes pulse {
     0%, 100% { box-shadow: 0 0 40px #00FFA340, 0 8px 32px #00000080; }
@@ -126,11 +205,24 @@
 
 <div id="backdrop"></div>
 
-<div id="container">
-  <div id="wheel-wrap">
-    <div id="pointer"></div>
-    <canvas id="canvas" width="520" height="520"></canvas>
+<div id="container" class="mode-wheel">
+  <div id="wheel-stage">
+    <div id="wheel-pointer"></div>
+    <div id="wheel-rotate">
+      <img id="wheel-disc" alt="">
+      <canvas id="wheel-canvas" width="520" height="520"></canvas>
+    </div>
   </div>
+
+  <div id="slot-stage">
+    <img id="slot-frame" alt="">
+    <div id="slot-window">
+      <canvas id="slot-canvas" width="1100" height="150"></canvas>
+    </div>
+    <div id="slot-ind-top"></div>
+    <div id="slot-ind-bottom"></div>
+  </div>
+
   <div id="donor-info">
     <div id="donor-name"></div>
     <div id="donor-amount"></div>
@@ -147,71 +239,385 @@
 <script>
 const COLORS = ['#00FFA3','#A78BFA','#F4A261','#72EFDD','#FF6B9D','#FFD166','#06D6A0','#C77DFF']
 const BG = '#17191D'
+const DEFAULT_SLOT_LAYOUT = {
+  width: '1280px',
+  height: '426px',
+  left: '12%',
+  right: '12%',
+  top: '32%',
+  bottom: '34%',
+  visibleCells: 5.25,
+  cardInset: 10,
+  cardWidthRatio: 0.4,
+  cardMinWidth: 300,
+  cardMaxWidth: 450,
+  cardHeightRatio: 0.58,
+  cardMinHeight: 54,
+  fadeOpacity: 0.92,
+}
+const SLOT_LAYOUTS = {
+  '레트로': { width: '1280px', height: '426px', left: '13%', right: '13%', top: '35%', bottom: '36%', visibleCells: 5.45, cardInset: 8, cardHeightRatio: 0.52, fadeOpacity: 0.72, cardStyle: 'retro' },
+  '마법': { width: '1280px', height: '426px', left: '14%', right: '14%', top: '32%', bottom: '35%', visibleCells: 5.15, cardInset: 9, cardHeightRatio: 0.56, cardStyle: 'magic' },
+  '베이커리': { width: '1280px', height: '426px', left: '15.5%', right: '16%', top: '36%', bottom: '30%', visibleCells: 5.25, cardInset: 12, cardHeightRatio: 0.46, fadeOpacity: 0.34, cardStyle: 'bakery' },
+  '사이버펑크': { width: '1280px', height: '426px', left: '10%', right: '10%', top: '35%', bottom: '36%', visibleCells: 5.55, cardInset: 8, cardHeightRatio: 0.54, cardStyle: 'cyber' },
+  '숲 컨셉': { width: '1280px', height: '426px', left: '17.5%', right: '17.5%', top: '33%', bottom: '28%', visibleCells: 5.15, cardInset: 12, cardHeightRatio: 0.44, fadeOpacity: 0.32, cardStyle: 'forest' },
+  '칠판': { width: '1280px', height: '426px', left: '13%', right: '13%', top: '31%', bottom: '35%', visibleCells: 5.35, cardInset: 9, cardHeightRatio: 0.54, cardStyle: 'chalk' },
+  '해적': { width: '1280px', height: '320px', left: '9.5%', right: '9.5%', top: '34%', bottom: '22%', visibleCells: 5.65, cardInset: 13, cardHeightRatio: 0.50, fadeOpacity: 0.55, indicatorTopOffset: '18px', cardStyle: 'pirate' },
+}
+const SLOT_CARD_STYLES = {
+  default: {
+    top: 'rgba(26,28,36,0.94)',
+    bottom: 'rgba(15,17,24,0.96)',
+    border: 'rgba(0,255,163,0.7)',
+    inner: 'rgba(255,255,255,0.08)',
+    text: '#F6FFF9',
+    shadow: 'rgba(0,255,163,0.2)',
+  },
+  retro: {
+    top: 'rgba(27,25,56,0.96)',
+    bottom: 'rgba(6,16,36,0.98)',
+    border: 'rgba(0,226,255,0.9)',
+    inner: 'rgba(255,68,215,0.28)',
+    text: '#F8FDFF',
+    shadow: 'rgba(0,226,255,0.38)',
+  },
+  magic: {
+    top: 'rgba(47,36,91,0.9)',
+    bottom: 'rgba(21,18,55,0.96)',
+    border: 'rgba(211,170,89,0.9)',
+    inner: 'rgba(160,111,255,0.32)',
+    text: '#FFF7D6',
+    shadow: 'rgba(155,94,255,0.38)',
+  },
+  bakery: {
+    top: 'rgba(255,230,181,0.94)',
+    bottom: 'rgba(214,148,92,0.92)',
+    border: 'rgba(125,72,42,0.75)',
+    inner: 'rgba(255,255,255,0.26)',
+    text: '#4A2D1E',
+    shadow: 'rgba(169,86,52,0.23)',
+  },
+  cyber: {
+    top: 'rgba(21,27,50,0.95)',
+    bottom: 'rgba(8,13,29,0.98)',
+    border: 'rgba(255,48,227,0.82)',
+    inner: 'rgba(0,234,255,0.24)',
+    text: '#EAFBFF',
+    shadow: 'rgba(255,48,227,0.3)',
+  },
+  forest: {
+    top: 'rgba(227,188,94,0.9)',
+    bottom: 'rgba(110,139,63,0.92)',
+    border: 'rgba(60,104,47,0.78)',
+    inner: 'rgba(255,245,183,0.28)',
+    text: '#26351C',
+    shadow: 'rgba(83,126,45,0.25)',
+  },
+  chalk: {
+    top: 'rgba(45,82,63,0.94)',
+    bottom: 'rgba(22,54,44,0.98)',
+    border: 'rgba(236,226,183,0.72)',
+    inner: 'rgba(255,255,255,0.12)',
+    text: '#F7F1D0',
+    shadow: 'rgba(0,255,163,0.18)',
+  },
+  pirate: {
+    top: 'rgba(97,63,35,0.95)',
+    bottom: 'rgba(32,22,16,0.98)',
+    border: 'rgba(214,164,77,0.86)',
+    inner: 'rgba(255,220,128,0.2)',
+    text: '#FFF0C2',
+    shadow: 'rgba(214,164,77,0.3)',
+  },
+}
 
-const canvas   = document.getElementById('canvas')
-const ctx      = canvas.getContext('2d')
 const container = document.getElementById('container')
 const backdrop = document.getElementById('backdrop')
-const donorInfo = document.getElementById('donor-info')
 const donorName = document.getElementById('donor-name')
 const donorAmount = document.getElementById('donor-amount')
-const donorMsg  = document.getElementById('donor-message')
+const donorMsg = document.getElementById('donor-message')
 const winnerBanner = document.getElementById('winner-banner')
-const winnerName   = document.getElementById('winner-name')
+const winnerName = document.getElementById('winner-name')
 
+const wheelCanvas = document.getElementById('wheel-canvas')
+const wheelCtx = wheelCanvas.getContext('2d')
+const wheelRotateEl = document.getElementById('wheel-rotate')
+const wheelDiscEl = document.getElementById('wheel-disc')
+
+const slotStage = document.getElementById('slot-stage')
+const slotFrame = document.getElementById('slot-frame')
+const slotCanvas = document.getElementById('slot-canvas')
+const slotCtx = slotCanvas.getContext('2d')
+
+let activeTheme = 'default'
+let activeMode = 'wheel'
 let currentAngle = 0
+let slotScrollY = 0
+let activeSpinId = null
+let activeRouletteId = null
+let currentDonation = null
 let hideTimer = null
+let isSpinning = false
 
-function drawWheel(items, angle) {
-  const cx = canvas.width / 2
-  const cy = canvas.height / 2
-  const r  = cx - 8
+let slotCanvasW = 1100
+let slotCanvasH = 150
+let slotCellW = 200
+let slotCellH = 110
+let slotCenterX = 550
+let slotCenterY = 75
+let slotStepY = 128
+let slotFadeH = 52
+let activeSlotLayout = DEFAULT_SLOT_LAYOUT
 
+let lastItems = [
+  { label: '항목 1', weight: 1 },
+  { label: '항목 2', weight: 1 },
+  { label: '항목 3', weight: 1 },
+]
+
+function normalizeMode(mode) {
+  return mode === 'slot' ? 'slot' : 'wheel'
+}
+
+function isThemed() {
+  return activeTheme !== 'default'
+}
+
+function roundedRect(ctx, x, y, w, h, r) {
+  const radius = Math.min(r, w / 2, h / 2)
+  ctx.beginPath()
+  ctx.moveTo(x + radius, y)
+  ctx.lineTo(x + w - radius, y)
+  ctx.quadraticCurveTo(x + w, y, x + w, y + radius)
+  ctx.lineTo(x + w, y + h - radius)
+  ctx.quadraticCurveTo(x + w, y + h, x + w - radius, y + h)
+  ctx.lineTo(x + radius, y + h)
+  ctx.quadraticCurveTo(x, y + h, x, y + h - radius)
+  ctx.lineTo(x, y + radius)
+  ctx.quadraticCurveTo(x, y, x + radius, y)
+  ctx.closePath()
+}
+
+function applyConfig(themeId, mode) {
+  if (themeId !== undefined) activeTheme = themeId || 'default'
+  if (mode !== undefined) activeMode = normalizeMode(mode)
+
+  container.classList.toggle('mode-wheel', activeMode === 'wheel')
+  container.classList.toggle('mode-slot', activeMode === 'slot')
+
+  const themed = isThemed()
+  wheelDiscEl.style.display = activeMode === 'wheel' && themed ? 'block' : 'none'
+  if (activeMode === 'wheel' && themed) {
+    wheelDiscEl.src = '/overlay/roulette-themes/' + encodeURIComponent(activeTheme) + '(원판).png'
+  }
+
+  slotStage.classList.toggle('themed', activeMode === 'slot' && themed)
+  if (activeMode === 'slot' && themed) {
+    activeSlotLayout = SLOT_LAYOUTS[activeTheme] || DEFAULT_SLOT_LAYOUT
+    slotStage.style.setProperty('--slot-stage-width', activeSlotLayout.width)
+    slotStage.style.setProperty('--slot-stage-height', activeSlotLayout.height)
+    slotStage.style.setProperty('--slot-left', activeSlotLayout.left)
+    slotStage.style.setProperty('--slot-right', activeSlotLayout.right)
+    slotStage.style.setProperty('--slot-top', activeSlotLayout.top)
+    slotStage.style.setProperty('--slot-bottom', activeSlotLayout.bottom)
+    slotStage.style.setProperty('--slot-ind-top-offset', activeSlotLayout.indicatorTopOffset || '0px')
+    slotStage.style.setProperty('--slot-ind-bottom-offset', activeSlotLayout.indicatorBottomOffset || '0px')
+    slotFrame.src = '/overlay/roulette-themes/' + encodeURIComponent(activeTheme) + '.png'
+  } else {
+    activeSlotLayout = DEFAULT_SLOT_LAYOUT
+    slotStage.style.removeProperty('--slot-stage-width')
+    slotStage.style.removeProperty('--slot-stage-height')
+    slotStage.style.removeProperty('--slot-left')
+    slotStage.style.removeProperty('--slot-right')
+    slotStage.style.removeProperty('--slot-top')
+    slotStage.style.removeProperty('--slot-bottom')
+    slotStage.style.removeProperty('--slot-ind-top-offset')
+    slotStage.style.removeProperty('--slot-ind-bottom-offset')
+    slotFrame.removeAttribute('src')
+  }
+
+  backdrop.style.background = themed ? 'rgba(10, 11, 15, 0.3)' : ''
+
+  requestAnimationFrame(() => {
+    if (activeMode === 'slot') drawSlotReel(lastItems, slotScrollY)
+    else if (themed) drawThemedWheelLabels(lastItems)
+    else drawColoredWheel(lastItems, currentAngle)
+  })
+}
+
+function setDonationInfo(donation) {
+  donorName.textContent = donation.nickname
+  donorAmount.textContent = donation.amount.toLocaleString() + ' 치즈'
+  donorMsg.textContent = donation.message || ''
+}
+
+function showOverlay(donation) {
+  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null }
+  winnerBanner.classList.remove('show')
+  container.classList.remove('winner-active')
+  currentDonation = donation
+  setDonationInfo(donation)
+  backdrop.classList.add('visible')
+  container.classList.add('visible')
+}
+
+function reportRouletteResult(winner) {
+  if (!activeSpinId || !winner) return
+  fetch('/api/roulette/result', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      spinId: activeSpinId,
+      rouletteId: activeRouletteId,
+      winner,
+      donation: currentDonation,
+      theme: activeTheme,
+      mode: activeMode,
+    }),
+  }).catch(() => {})
+}
+
+function finishSpin(winner) {
+  reportRouletteResult(winner)
+  setTimeout(() => {
+    winnerName.textContent = winner.label
+    container.classList.add('winner-active')
+    winnerBanner.classList.add('show')
+
+    hideTimer = setTimeout(() => {
+      winnerBanner.classList.remove('show')
+      container.classList.remove('winner-active')
+      backdrop.classList.remove('visible')
+      container.classList.remove('visible')
+      hideTimer = null
+    }, 8000)
+  }, 400)
+}
+
+function drawColoredWheel(items, angle) {
+  const cx = wheelCanvas.width / 2
+  const cy = wheelCanvas.height / 2
+  const r = cx - 8
   const total = items.reduce((s, i) => s + i.weight, 0)
-  ctx.clearRect(0, 0, canvas.width, canvas.height)
+  wheelCtx.clearRect(0, 0, wheelCanvas.width, wheelCanvas.height)
 
   let start = angle
   items.forEach((item, idx) => {
     const slice = (item.weight / total) * 2 * Math.PI
 
-    // 부채꼴
-    ctx.beginPath()
-    ctx.moveTo(cx, cy)
-    ctx.arc(cx, cy, r, start, start + slice)
-    ctx.closePath()
-    ctx.fillStyle = COLORS[idx % COLORS.length]
-    ctx.fill()
-    ctx.strokeStyle = BG
-    ctx.lineWidth = 2
-    ctx.stroke()
+    wheelCtx.beginPath()
+    wheelCtx.moveTo(cx, cy)
+    wheelCtx.arc(cx, cy, r, start, start + slice)
+    wheelCtx.closePath()
+    wheelCtx.fillStyle = COLORS[idx % COLORS.length]
+    wheelCtx.fill()
+    wheelCtx.strokeStyle = BG
+    wheelCtx.lineWidth = 2
+    wheelCtx.stroke()
 
-    // 라벨
-    ctx.save()
-    ctx.translate(cx, cy)
-    ctx.rotate(start + slice / 2)
-    ctx.textAlign = 'right'
-    ctx.fillStyle = BG
-    ctx.font = 'bold 14px Segoe UI, Malgun Gothic, sans-serif'
+    wheelCtx.save()
+    wheelCtx.translate(cx, cy)
+    wheelCtx.rotate(start + slice / 2)
+    wheelCtx.textAlign = 'right'
+    wheelCtx.fillStyle = BG
+    wheelCtx.font = 'bold 14px Segoe UI, Malgun Gothic, sans-serif'
     const lbl = item.label.length > 10 ? item.label.slice(0, 10) + '…' : item.label
-    ctx.fillText(lbl, r - 14, 5)
-    ctx.restore()
+    wheelCtx.fillText(lbl, r - 14, 5)
+    wheelCtx.restore()
 
     start += slice
   })
 
-  // 중앙 원
-  ctx.beginPath()
-  ctx.arc(cx, cy, 22, 0, 2 * Math.PI)
-  ctx.fillStyle = BG
-  ctx.fill()
-  ctx.strokeStyle = '#00FFA3'
-  ctx.lineWidth = 3
-  ctx.stroke()
+  wheelCtx.beginPath()
+  wheelCtx.arc(cx, cy, 22, 0, 2 * Math.PI)
+  wheelCtx.fillStyle = BG
+  wheelCtx.fill()
+  wheelCtx.strokeStyle = '#00FFA3'
+  wheelCtx.lineWidth = 3
+  wheelCtx.stroke()
 }
 
-function pickWinner(items, finalAngle) {
+function drawThemedWheelLabels(items) {
+  const cx = wheelCanvas.width / 2
+  const cy = wheelCanvas.height / 2
+  const r = cx - 8
+  const labelR = r * 0.58
   const total = items.reduce((s, i) => s + i.weight, 0)
-  // 포인터는 왼쪽(π) 방향이므로 normalizedAngle = π - finalAngle
+  const layout = SLOT_LAYOUTS[activeTheme] || DEFAULT_SLOT_LAYOUT
+  const cardStyle = SLOT_CARD_STYLES[layout.cardStyle] || SLOT_CARD_STYLES.default
+  wheelCtx.clearRect(0, 0, wheelCanvas.width, wheelCanvas.height)
+
+  let start = 0
+  items.forEach((item) => {
+    const slice = (item.weight / total) * 2 * Math.PI
+
+    wheelCtx.beginPath()
+    wheelCtx.moveTo(cx, cy)
+    wheelCtx.lineTo(cx + r * Math.cos(start), cy + r * Math.sin(start))
+    wheelCtx.strokeStyle = 'rgba(255,255,255,0.4)'
+    wheelCtx.lineWidth = 1.5
+    wheelCtx.stroke()
+
+    const mid = start + slice / 2
+    const labelX = cx + labelR * Math.cos(mid)
+    const labelY = cy + labelR * Math.sin(mid)
+    const boxW = Math.round(Math.min(190, Math.max(64, labelR * slice * 0.9)))
+    const boxH = Math.round(Math.min(40, Math.max(28, r * 0.13)))
+    const boxX = Math.round(labelX - boxW / 2)
+    const boxY = Math.round(labelY - boxH / 2)
+    const textMaxW = Math.max(24, boxW - 22)
+    const label = String(item.label ?? '')
+
+    wheelCtx.save()
+    const panelGradient = wheelCtx.createLinearGradient(boxX, boxY, boxX, boxY + boxH)
+    panelGradient.addColorStop(0, cardStyle.top)
+    panelGradient.addColorStop(1, cardStyle.bottom)
+    roundedRect(wheelCtx, boxX, boxY, boxW, boxH, 8)
+    wheelCtx.shadowColor = cardStyle.shadow
+    wheelCtx.shadowBlur = 8
+    wheelCtx.fillStyle = panelGradient
+    wheelCtx.fill()
+    wheelCtx.shadowBlur = 0
+    wheelCtx.strokeStyle = cardStyle.border
+    wheelCtx.lineWidth = 1.5
+    wheelCtx.stroke()
+
+    roundedRect(wheelCtx, boxX + 3, boxY + 3, boxW - 6, boxH - 6, 6)
+    wheelCtx.strokeStyle = cardStyle.inner
+    wheelCtx.lineWidth = 1
+    wheelCtx.stroke()
+
+    roundedRect(wheelCtx, boxX, boxY, boxW, boxH, 8)
+    wheelCtx.clip()
+    wheelCtx.textAlign = 'center'
+    wheelCtx.textBaseline = 'middle'
+    wheelCtx.fillStyle = cardStyle.text
+    wheelCtx.shadowColor = 'rgba(0,0,0,0.55)'
+    wheelCtx.shadowBlur = 3
+    let fontSize = 18
+    const minFontSize = 11
+    wheelCtx.font = `900 ${fontSize}px Segoe UI, Malgun Gothic, sans-serif`
+    while (fontSize > minFontSize && wheelCtx.measureText(label).width > textMaxW) {
+      fontSize -= 1
+      wheelCtx.font = `900 ${fontSize}px Segoe UI, Malgun Gothic, sans-serif`
+    }
+    drawTextWithinWidth(wheelCtx, label, labelX, labelY + 1, textMaxW)
+    wheelCtx.restore()
+
+    start += slice
+  })
+
+  wheelCtx.beginPath()
+  wheelCtx.arc(cx, cy, 22, 0, 2 * Math.PI)
+  wheelCtx.fillStyle = 'rgba(23,25,29,0.85)'
+  wheelCtx.fill()
+  wheelCtx.strokeStyle = '#00FFA3'
+  wheelCtx.lineWidth = 3
+  wheelCtx.stroke()
+}
+
+function pickWheelWinner(items, finalAngle) {
+  const total = items.reduce((s, i) => s + i.weight, 0)
   const normalized = ((Math.PI - finalAngle) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI)
   let cumulative = 0
   for (const item of items) {
@@ -221,74 +627,314 @@ function pickWinner(items, finalAngle) {
   return items[items.length - 1]
 }
 
-function spin(items, donation) {
-  // 이미 표시 중이면 초기화
-  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null }
-  winnerBanner.classList.remove('show')
+function spinWheel(items, donation) {
+  showOverlay(donation)
+  const themed = isThemed()
+  if (themed) {
+    drawThemedWheelLabels(items)
+    wheelRotateEl.style.transform = `rotate(${currentAngle}rad)`
+  } else {
+    drawColoredWheel(items, currentAngle)
+  }
 
-  // 후원자 정보 표시
-  donorName.textContent = donation.nickname
-  donorAmount.textContent = `${donation.amount.toLocaleString()} 치즈`
-  donorMsg.textContent = donation.message || ''
-
-  // 화면 표시
-  backdrop.classList.add('visible')
-  container.classList.add('visible')
-
-  // 초기 정적 그리기
-  drawWheel(items, currentAngle)
-
-  const stopAngle  = Math.random() * 2 * Math.PI
-  const totalRot   = (6 + Math.random() * 4) * 2 * Math.PI + stopAngle
-  const startTime  = performance.now()
-  const duration   = 5000
+  const stopAngle = Math.random() * 2 * Math.PI
+  const totalRot = (6 + Math.random() * 4) * 2 * Math.PI + stopAngle
   const startAngle = currentAngle
+  const startTime = performance.now()
+  const duration = 5000
 
   function animate(now) {
-    const elapsed  = now - startTime
+    const elapsed = now - startTime
     const progress = Math.min(elapsed / duration, 1)
-    // ease out cubic
-    const eased    = 1 - Math.pow(1 - progress, 3)
-    const angle    = startAngle + totalRot * eased
-    drawWheel(items, angle)
+    const eased = 1 - Math.pow(1 - progress, 3)
+    const angle = startAngle + totalRot * eased
+
+    if (themed) wheelRotateEl.style.transform = `rotate(${angle}rad)`
+    else drawColoredWheel(items, angle)
 
     if (progress < 1) {
       requestAnimationFrame(animate)
     } else {
-      currentAngle = angle % (2 * Math.PI)
-      const winner = pickWinner(items, currentAngle)
-
-      // 당첨 배너 표시
-      setTimeout(() => {
-        winnerName.textContent = winner.label
-        winnerBanner.classList.add('show')
-
-        // 8초 후 자동 숨김
-        hideTimer = setTimeout(() => {
-          winnerBanner.classList.remove('show')
-          backdrop.classList.remove('visible')
-          container.classList.remove('visible')
-          hideTimer = null
-        }, 8000)
-      }, 400)
+      currentAngle = angle
+      isSpinning = false
+      finishSpin(pickWheelWinner(items, currentAngle))
     }
   }
   requestAnimationFrame(animate)
 }
 
-// Socket.IO 연결
-const socket = io()
-socket.on('roulette:spin', (data) => {
-  if (!data.items || data.items.length < 2) return
-  spin(data.items, data.donation || { nickname: '???', amount: 0, message: '' })
+function syncSlotCanvasSize() {
+  const rect = slotCanvas.getBoundingClientRect()
+  const width = Math.max(1, Math.round(rect.width))
+  const height = Math.max(1, Math.round(rect.height))
+  const dpr = Math.min(window.devicePixelRatio || 1, 2)
+  const nextW = Math.round(width * dpr)
+  const nextH = Math.round(height * dpr)
+
+  if (slotCanvas.width !== nextW || slotCanvas.height !== nextH) {
+    slotCanvas.width = nextW
+    slotCanvas.height = nextH
+  }
+
+  slotCtx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  slotCanvasW = width
+  slotCanvasH = height
+  slotCenterX = Math.round(slotCanvasW / 2)
+  slotCenterY = Math.round(slotCanvasH / 2)
+  if (isThemed()) {
+    const maxCardH = Math.max(1, slotCanvasH - activeSlotLayout.cardInset * 2)
+    const targetCardH = slotCanvasH * (activeSlotLayout.cardHeightRatio ?? DEFAULT_SLOT_LAYOUT.cardHeightRatio)
+    const targetCardW = slotCanvasW * (activeSlotLayout.cardWidthRatio ?? DEFAULT_SLOT_LAYOUT.cardWidthRatio)
+    slotCellW = Math.round(Math.min(
+      activeSlotLayout.cardMaxWidth ?? DEFAULT_SLOT_LAYOUT.cardMaxWidth,
+      Math.max(activeSlotLayout.cardMinWidth ?? DEFAULT_SLOT_LAYOUT.cardMinWidth, targetCardW)
+    ))
+    slotCellH = Math.round(Math.max(activeSlotLayout.cardMinHeight ?? DEFAULT_SLOT_LAYOUT.cardMinHeight, Math.min(maxCardH, targetCardH)))
+    slotStepY = Math.round(slotCellH + 8)
+    slotFadeH = 0
+  } else {
+    slotCellW = 280
+    slotCellH = 110
+    slotStepY = slotCellH + 10
+    slotFadeH = 0
+  }
+}
+
+function drawTextWithinWidth(ctx, text, x, y, maxWidth) {
+  const label = String(text ?? '')
+  if (!label) return
+  ctx.fillText(label, x, y, maxWidth)
+}
+
+function drawSlotCell(item, itemIdx, cellLeft, cellTop, cellCenterX, cellCenterY, isCenter) {
+  const themed = isThemed()
+  const cardStyle = themed
+    ? SLOT_CARD_STYLES[activeSlotLayout.cardStyle] || SLOT_CARD_STYLES.default
+    : null
+  const pad = themed ? Math.max(8, activeSlotLayout.cardInset - 2) : 6
+  const x = cellLeft + pad
+  const y = cellTop
+  const w = slotCellW - pad * 2
+  const h = slotCellH
+  const accent = COLORS[itemIdx % COLORS.length]
+  const label = String(item.label ?? '')
+
+  slotCtx.save()
+  roundedRect(slotCtx, x, y, w, h, themed ? 12 : 10)
+  if (themed) {
+    const cardGradient = slotCtx.createLinearGradient(x, y, x, y + h)
+    cardGradient.addColorStop(0, cardStyle.top)
+    cardGradient.addColorStop(1, cardStyle.bottom)
+    slotCtx.shadowColor = isCenter ? cardStyle.shadow : 'rgba(0,0,0,0.18)'
+    slotCtx.shadowBlur = isCenter ? 14 : 5
+    slotCtx.shadowOffsetY = isCenter ? 3 : 1
+    slotCtx.fillStyle = cardGradient
+    slotCtx.fill()
+    slotCtx.shadowBlur = 0
+    slotCtx.shadowOffsetY = 0
+    slotCtx.strokeStyle = cardStyle.border
+    slotCtx.lineWidth = isCenter ? 2 : 1
+    slotCtx.stroke()
+
+    roundedRect(slotCtx, x + 3, y + 3, w - 6, h - 6, themed ? 9 : 7)
+    slotCtx.strokeStyle = cardStyle.inner
+    slotCtx.lineWidth = 1
+    slotCtx.stroke()
+
+  } else if (isCenter) {
+    slotCtx.fillStyle = accent
+    slotCtx.fill()
+    slotCtx.strokeStyle = 'rgba(255,255,255,0.9)'
+    slotCtx.lineWidth = 2.5
+    slotCtx.stroke()
+  } else {
+    slotCtx.fillStyle = accent + '55'
+    slotCtx.fill()
+  }
+  slotCtx.restore()
+
+  slotCtx.save()
+  roundedRect(slotCtx, x, y, w, h, themed ? 12 : 10)
+  slotCtx.clip()
+  slotCtx.textAlign = 'center'
+  slotCtx.textBaseline = 'middle'
+
+  if (themed) {
+    slotCtx.fillStyle = cardStyle.text
+    slotCtx.shadowColor = 'rgba(0,0,0,0.45)'
+    slotCtx.shadowBlur = isCenter ? 4 : 2
+    let fontSize = isCenter ? 21 : 16
+    const fontWeight = isCenter ? 900 : 700
+    const minFontSize = isCenter ? 14 : 12
+    const maxTextWidth = Math.max(24, w - 28)
+    slotCtx.font = `${fontWeight} ${fontSize}px Segoe UI, Malgun Gothic, sans-serif`
+    while (fontSize > minFontSize && slotCtx.measureText(label).width > maxTextWidth) {
+      fontSize -= 1
+      slotCtx.font = `${fontWeight} ${fontSize}px Segoe UI, Malgun Gothic, sans-serif`
+    }
+  } else {
+    slotCtx.fillStyle = isCenter ? '#17191D' : 'rgba(255,255,255,0.45)'
+    let fontSize = isCenter ? 18 : 14
+    const maxTextWidth = Math.max(24, w - 28)
+    slotCtx.font = `bold ${fontSize}px Segoe UI, Malgun Gothic, sans-serif`
+    while (fontSize > 12 && slotCtx.measureText(label).width > maxTextWidth) {
+      fontSize -= 1
+      slotCtx.font = `bold ${fontSize}px Segoe UI, Malgun Gothic, sans-serif`
+    }
+  }
+
+  drawTextWithinWidth(slotCtx, label, cellCenterX, cellCenterY + (themed ? 4 : 0), Math.max(24, w - 28))
+  slotCtx.restore()
+}
+
+function drawSlotReel(items, sy) {
+  const n = items.length
+  if (n === 0) return
+  lastItems = items
+  syncSlotCanvasSize()
+
+  const themed = isThemed()
+  slotCtx.clearRect(0, 0, slotCanvasW, slotCanvasH)
+
+  if (!themed) {
+    slotCtx.fillStyle = 'rgba(23,25,29,0.9)'
+    roundedRect(slotCtx, 0, 0, slotCanvasW, slotCanvasH, 16)
+    slotCtx.fill()
+  }
+
+  const centerVirtualIdx = Math.round(sy / slotStepY)
+  const visibleRows = 3
+  const startV = centerVirtualIdx - visibleRows
+  const endV = centerVirtualIdx + visibleRows
+  const cellLeft = Math.round(slotCenterX - slotCellW / 2)
+  const targetTop = Math.round(slotCenterY - slotCellH / 2)
+  const clipPad = themed ? 3 : 4
+
+  slotCtx.save()
+  roundedRect(
+    slotCtx,
+    cellLeft - clipPad,
+    targetTop - clipPad,
+    slotCellW + clipPad * 2,
+    slotCellH + clipPad * 2,
+    themed ? 13 : 12
+  )
+  slotCtx.clip()
+
+  for (let vi = startV; vi <= endV; vi++) {
+    const itemIdx = ((vi % n) + n) % n
+    const item = items[itemIdx]
+    const cellCenterY = Math.round(vi * slotStepY - sy + slotCenterY)
+    const cellTop = Math.round(cellCenterY - slotCellH / 2)
+
+    if (cellTop + slotCellH < 0 || cellTop > slotCanvasH) continue
+    drawSlotCell(item, itemIdx, cellLeft, cellTop, slotCenterX, cellCenterY, vi === centerVirtualIdx)
+  }
+  slotCtx.restore()
+
+  slotCtx.strokeStyle = themed ? 'rgba(255,255,255,0.78)' : '#00FFA3'
+  slotCtx.lineWidth = themed ? 2 : 2
+  slotCtx.shadowColor = themed ? 'rgba(255,255,255,0.55)' : '#00FFA3'
+  slotCtx.shadowBlur = themed ? 7 : 8
+  const lineLeft = slotCenterX - slotCellW / 2 + 12
+  const lineRight = slotCenterX + slotCellW / 2 - 12
+  const lineTop = slotCenterY - slotCellH / 2 + 4
+  const lineBottom = slotCenterY + slotCellH / 2 - 4
+  slotCtx.beginPath()
+  slotCtx.moveTo(lineLeft, lineTop)
+  slotCtx.lineTo(lineRight, lineTop)
+  slotCtx.stroke()
+  slotCtx.beginPath()
+  slotCtx.moveTo(lineLeft, lineBottom)
+  slotCtx.lineTo(lineRight, lineBottom)
+  slotCtx.stroke()
+  slotCtx.shadowBlur = 0
+}
+
+function pickWeightedWinner(items) {
+  const total = items.reduce((s, i) => s + i.weight, 0)
+  let rand = Math.random() * total
+  for (const item of items) {
+    rand -= item.weight
+    if (rand <= 0) return item
+  }
+  return items[items.length - 1]
+}
+
+function getSlotTargetRow(currentScrollY, itemIdx, itemCount, minRevs) {
+  const currentRow = Math.round(currentScrollY / slotStepY)
+  const currentRev = Math.floor(currentRow / itemCount)
+  return (currentRev + minRevs + 1) * itemCount + itemIdx
+}
+
+function spinSlot(items, donation) {
+  showOverlay(donation)
+  syncSlotCanvasSize()
+
+  const winner = pickWeightedWinner(items)
+  const winnerIdx = items.indexOf(winner)
+  const n = items.length
+  const minRevs = 6
+  const targetRow = getSlotTargetRow(slotScrollY, winnerIdx, n, minRevs)
+
+  const s0 = slotScrollY
+  const duration = 5000
+  const startTime = performance.now()
+
+  function animate(now) {
+    const elapsed = now - startTime
+    const progress = Math.min(elapsed / duration, 1)
+    const eased = 1 - Math.pow(1 - progress, 4)
+    syncSlotCanvasSize()
+    const sf = targetRow * slotStepY
+    slotScrollY = s0 + (sf - s0) * eased
+    drawSlotReel(items, slotScrollY)
+
+    if (progress < 1) {
+      requestAnimationFrame(animate)
+    } else {
+      syncSlotCanvasSize()
+      slotScrollY = targetRow * slotStepY
+      drawSlotReel(items, slotScrollY)
+      isSpinning = false
+      finishSpin(winner)
+    }
+  }
+  requestAnimationFrame(animate)
+}
+
+function spin(items, donation, spinId, rouletteId) {
+  if (isSpinning) return
+  isSpinning = true
+  activeSpinId = spinId || null
+  activeRouletteId = rouletteId || null
+  lastItems = items
+  if (activeMode === 'slot') spinSlot(items, donation)
+  else spinWheel(items, donation)
+}
+
+fetch('/api/roulette')
+  .then(r => r.ok ? r.json() : {})
+  .then(cfg => applyConfig(cfg.theme, cfg.mode))
+  .catch(() => {})
+
+drawColoredWheel(lastItems, 0)
+window.addEventListener('resize', () => {
+  if (activeMode === 'slot') drawSlotReel(lastItems, slotScrollY)
 })
 
-// 초기 빈 휠 그리기
-drawWheel([
-  { label: '항목 1', weight: 1 },
-  { label: '항목 2', weight: 1 },
-  { label: '항목 3', weight: 1 },
-], 0)
+const socket = io()
+
+socket.on('roulette:config', (data) => {
+  if (!data) return
+  applyConfig(data.theme, data.mode)
+})
+
+socket.on('roulette:spin', (data) => {
+  if (!data.items || data.items.length < 2) return
+  applyConfig(data.theme, data.mode)
+  spin(data.items, data.donation || { nickname: '???', amount: 0, message: '' }, data.spinId, data.rouletteId)
+})
 </script>
 </body>
 </html>

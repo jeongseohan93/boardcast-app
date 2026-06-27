@@ -18,14 +18,28 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuthStore } from './store/authStore'
 import { useSocket } from './hooks/useSocket'
 import Layout from './components/Layout'
+import TitleBar from './components/TitleBar'
 import ToastContainer from './components/ToastContainer'
 import OnboardingPage from './pages/OnboardingPage'
 import DashboardPage from './pages/DashboardPage'
 import BotPage from './pages/BotPage'
+import NoticePage from './pages/NoticePage'
+import VideoDonationPage from './pages/VideoDonationPage'
 import AlertHistoryPage from './pages/AlertHistoryPage'
+import FollowerListPage from './pages/FollowerListPage'
+import RestrictionPage from './pages/RestrictionPage'
 import RoulettePage from './pages/RoulettePage'
+import TamagotchiPage from './pages/TamagotchiPage'
+import EmotePartyPage from './pages/EmotePartyPage'
 import OverlayPage from './pages/OverlayPage'
+import OverlaySettingsPage from './pages/OverlaySettingsPage'
+import VotePage from './pages/VotePage'
 import SettingsPage from './pages/SettingsPage'
+import StatisticsPage from './pages/StatisticsPage'
+import PubgStatsPage from './pages/PubgStatsPage'
+import MissionPage from './pages/MissionPage'
+import RawEventDebugPage from './pages/RawEventDebugPage'
+import { applyAppTheme, getStoredAppTheme } from './utils/appTheme'
 
 function AppInner() {
   const { isAuthenticated, hasCredentials, isLoading } = useAuthStore()
@@ -36,7 +50,7 @@ function AppInner() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen bg-bg-outer">
+      <div className="flex items-center justify-center h-full bg-bg-outer">
         <div className="text-text-secondary text-sm animate-pulse">로딩 중...</div>
       </div>
     )
@@ -59,11 +73,23 @@ function AppInner() {
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/bot"       element={<BotPage />} />
+        <Route path="/notice" element={<NoticePage />} />
+        <Route path="/video-donation" element={<VideoDonationPage />} />
         <Route path="/chat" element={<Navigate to="/dashboard" replace />} />
         <Route path="/live" element={<Navigate to="/dashboard" replace />} />
         <Route path="/history" element={<AlertHistoryPage />} />
+        <Route path="/followers" element={<FollowerListPage />} />
+        <Route path="/restrictions" element={<RestrictionPage />} />
         <Route path="/roulette" element={<RoulettePage />} />
+        <Route path="/tamagotchi" element={<TamagotchiPage />} />
+        <Route path="/emote-party" element={<EmotePartyPage />} />
         <Route path="/overlay" element={<OverlayPage />} />
+        <Route path="/overlay-settings" element={<OverlaySettingsPage />} />
+        <Route path="/mission" element={<MissionPage />} />
+        <Route path="/vote" element={<VotePage />} />
+        <Route path="/pubg" element={<PubgStatsPage />} />
+        <Route path="/statistics" element={<StatisticsPage />} />
+        <Route path="/debug-events" element={<RawEventDebugPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
@@ -77,13 +103,18 @@ export default function App() {
   // 앱 시작 시 1회 인증 상태 확인
   // GET /auth/status → isAuthenticated, hasCredentials, channelId 등 설정
   useEffect(() => {
+    applyAppTheme(getStoredAppTheme())
     checkAuth()
   }, [checkAuth])
 
   return (
     <HashRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <AppInner />
-      {/* ToastContainer: 도네이션/구독/팔로우 알림을 화면 우하단에 표시 */}
+      <div className="flex flex-col h-screen overflow-hidden">
+        <TitleBar />
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <AppInner />
+        </div>
+      </div>
       <ToastContainer />
     </HashRouter>
   )
