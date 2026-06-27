@@ -1,3 +1,26 @@
+/**
+ * [활동제한 페이지]
+ *
+ * 채널에 활동제한(차단)을 설정한 유저 목록을 조회하고, 제한을 해제하거나 임시차단을 추가할 수 있는 페이지.
+ *
+ * ── rowsFromResponse ─────────────────────────────────────────────────────
+ *   활동제한 목록 API 응답이 여러 형태로 올 수 있다.
+ *   root.data 배열, root.content.data 배열, root.content 배열, root 배열 순으로 시도해
+ *   어느 버전의 Chzzk API 응답이 와도 올바르게 파싱한다.
+ *
+ * ── nextFromResponse ─────────────────────────────────────────────────────
+ *   커서 기반 페이지네이션에서 다음 페이지 커서를 추출한다.
+ *   API 버전마다 커서 필드 이름이 다를 수 있어 복수 경로를 순서대로 탐색한다.
+ *
+ * ── chatChannelId (임시차단용) ───────────────────────────────────────────
+ *   임시차단(temporary restriction)은 chatChannelId 를 요청 파라미터로 받아야 한다.
+ *   페이지 마운트 시 chatApi.getChatChannelId() 를 호출해 미리 캐시해둔다.
+ *   chatChannelId 가 없으면 임시차단 버튼이 비활성화된다.
+ *
+ * ── 검색 (useMemo 기반 클라이언트 필터링) ───────────────────────────────
+ *   서버에서 전체 목록을 받아온 뒤 로컬에서 닉네임/채널ID 기준으로 필터링한다.
+ *   API 호출 없이 즉각 반응하기 위해 useMemo 로 파생 상태를 계산한다.
+ */
 import { useEffect, useMemo, useState } from 'react'
 import { Ban, Clock, RefreshCw, Search, ShieldBan, ShieldCheck, UserX } from 'lucide-react'
 import { channelApi, chatApi } from '../api/client'

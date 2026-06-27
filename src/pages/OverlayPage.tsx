@@ -1,3 +1,22 @@
+/**
+ * [오버레이 페이지]
+ *
+ * OBS Browser Source 에 추가할 오버레이 URL 목록을 조회하고, 방화벽 설정을 지원하는 페이지.
+ *
+ * ── 네트워크 IP 감지 (/api/network-info) ────────────────────────────────
+ *   OBS 가 동일 PC 에서 실행될 때는 localhost 를 사용하면 되지만,
+ *   별도 PC 또는 스트리밍 PC 환경에서는 로컬 LAN IP 가 필요하다.
+ *   /api/network-info 를 통해 서버가 실제 NIC IP 를 반환하며, 실패 시 localhost 를 폴백으로 쓴다.
+ *
+ * ── Windows 방화벽 (electronAPI.addFirewallRule) ──────────────────────────
+ *   외부 PC 에서 오버레이에 접근하려면 3001 포트가 방화벽에서 열려 있어야 한다.
+ *   "방화벽 허용" 버튼 클릭 시 Electron main 프로세스가 netsh advfirewall 명령을 실행한다.
+ *   firewallState: 'idle'|'loading'|'ok'|'fail' 로 버튼 UI 상태를 제어한다.
+ *
+ * ── OVERLAYS / buildOverlayUrl ───────────────────────────────────────────
+ *   overlayShared.tsx 의 OVERLAYS 배열에서 오버레이 종류를 가져온다.
+ *   각 항목별로 selectedThemes 와 ovSettings 를 합산해 buildOverlayUrl 로 최종 URL 을 생성한다.
+ */
 import { useEffect, useState } from 'react'
 import { Copy, Monitor, Play, Wifi, Shield, CheckCircle, AlertTriangle } from 'lucide-react'
 import { api } from '../api/client'

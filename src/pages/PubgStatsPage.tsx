@@ -1,3 +1,33 @@
+/**
+ * [PUBG 전적 페이지]
+ *
+ * PUBG(배틀그라운드) 플레이어 전적을 조회하고, 시즌 통계·최근 매치를 표시하는 페이지.
+ *
+ * ── Platform / GameMode ───────────────────────────────────────────────────
+ *   Platform: 'steam' | 'kakao' | 'psn' | 'xbox' — PUBG API 플랫폼 파라미터
+ *   GameMode: 'solo' | 'solo-fpp' | 'duo' | ... — 모드별 통계 분리 조회에 사용
+ *
+ * ── API 키 저장 (password input) ──────────────────────────────────────────
+ *   PUBG API 키는 서버 사이드에 저장되므로 클라이언트에는 전달되지 않는다.
+ *   입력 필드는 type="password" 로 렌더링해 화면 캡처 시 노출을 방지한다.
+ *
+ * ── HTTP 상태 코드 처리 ────────────────────────────────────────────────────
+ *   428 Precondition Required → API 키가 설정되지 않은 상태. 키 입력 안내 메시지 표시.
+ *   404 Not Found            → 존재하지 않는 닉네임. "플레이어를 찾을 수 없음" 메시지 표시.
+ *
+ * ── 헬퍼 함수 (n / f / pct / km / rate) ─────────────────────────────────
+ *   n    → 숫자 null-safe 변환 (undefined → 0)
+ *   f    → 소수점 1자리 포맷팅
+ *   pct  → 퍼센트 포맷팅 (0~100)
+ *   km   → 미터를 킬로미터로 변환
+ *   rate → 분모가 0 일 때 안전한 비율 계산
+ *
+ * ── 서브컴포넌트 ──────────────────────────────────────────────────────────
+ *   SummaryCard  → 시즌 전체 요약 카드 (K/D, 승률, 평균 딜 등)
+ *   Metric       → 단일 지표 레이블+값 셀
+ *   RankRow      → 랭킹 행 (게임 모드 + 티어/포인트)
+ *   RecentMetric → 최근 매치 요약 지표
+ */
 import { useEffect, useMemo, useState } from 'react'
 import { Activity, Clock, Crosshair, Gamepad2, KeyRound, MapPin, RefreshCw, Search, Shield, Target, Trophy, Users } from 'lucide-react'
 import { pubgApi } from '../api/client'

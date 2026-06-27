@@ -1,3 +1,23 @@
+/**
+ * [봇 설정 페이지]
+ *
+ * 채팅봇 명령어(BotCommand)와 자동공지(AutoNotice) 두 가지 기능을 하나의 페이지에서 관리.
+ *
+ * ── 탭 구조 ───────────────────────────────────────────────────────────────
+ *   '명령어' 탭 → BotCommand CRUD (트리거 / 응답 / 쿨다운 / 권한 / 활성화)
+ *   '자동공지' 탭 → AutoNotice CRUD (메시지 / 반복 주기 / 활성화)
+ *
+ * ── PERMISSION_LABEL / PERMISSION_COLOR ──────────────────────────────────
+ *   권한 수준을 한국어 레이블과 CSS 클래스로 매핑하는 상수 객체.
+ *   Record 타입으로 BotCommand['permission'] 의 모든 변형을 빠짐없이 커버한다.
+ *
+ * ── CommandForm (인라인 서브컴포넌트) ────────────────────────────────────
+ *   새 명령어 추가 / 기존 명령어 편집 모드 두 가지를 동일 폼으로 처리.
+ *   editingId가 null이면 추가, 값이 있으면 수정 모드로 동작한다.
+ *
+ * ── 쿨다운 표시 ───────────────────────────────────────────────────────────
+ *   cooldown 은 초 단위 숫자로 저장되고, 60 이상이면 분 단위로 환산해 표시한다.
+ */
 import { useEffect, useState } from 'react'
 import { Plus, Trash2, Check, X, Bot, Pencil, Bell, Clock } from 'lucide-react'
 import { botApi, autoNoticeApi } from '../api/client'

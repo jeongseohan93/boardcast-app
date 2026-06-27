@@ -1,3 +1,30 @@
+/**
+ * [다마고치 페이지]
+ *
+ * 방송 참여도(후원·팔로우)에 따라 성장하는 마스코트 캐릭터(다마고치)의 상태를 관리하는 페이지.
+ *
+ * ── STAGE_META / THEME_META / MASCOT_THEME ────────────────────────────────
+ *   캐릭터 성장 단계(egg→baby→teen→star)와 테마별 색상·이름을 정의하는 메타 데이터 Record.
+ *   현재 stage 와 theme 에 따라 UI 컬러와 아이콘이 달라진다.
+ *
+ * ── TamagotchiMascot (SVG 인라인 컴포넌트) ───────────────────────────────
+ *   radialGradient 를 사용한 SVG 마스코트를 React 컴포넌트로 구현했다.
+ *   mood 값에 따라 표정(눈/입 모양)이 달라지고 기분 이모티콘도 변경된다.
+ *   CSS `<linearGradient>` 대신 SVG `<radialGradient>` 를 사용한 이유:
+ *   캐릭터의 구형 질감 표현에 radial 이 더 자연스럽기 때문.
+ *
+ * ── overlayUrl (localhost:3001 고정) ─────────────────────────────────────
+ *   다마고치 오버레이는 별도 overlay 경로에 서빙되며 OBS Browser Source URL 로 제공된다.
+ *   buildOverlayUrl 을 사용하지 않고 직접 하드코딩된 이유:
+ *   다마고치 오버레이는 별도 커스텀 파라미터가 없어 빌더가 불필요하다.
+ *
+ * ── 리셋 (confirm 확인 필수) ─────────────────────────────────────────────
+ *   다마고치 초기화는 모든 성장 데이터를 지우는 파괴적 작업이므로 confirm() 으로 재확인한다.
+ *
+ * ── 서브컴포넌트 ──────────────────────────────────────────────────────────
+ *   Metric → 단일 지표 레이블+값+아이콘 셀
+ *   Gauge  → 좁은 막대 그래프로 mood/hunger/energy 를 시각화하는 게이지
+ */
 import { useEffect, useMemo, useState } from 'react'
 import { Copy, ExternalLink, Gift, Heart, Play, RefreshCw, RotateCcw, Sparkles } from 'lucide-react'
 import { tamagotchiApi } from '../api/client'

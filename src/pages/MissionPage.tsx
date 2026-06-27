@@ -1,3 +1,28 @@
+/**
+ * [미션 페이지]
+ *
+ * 실시간 후원 미션 목록을 표시하고, 오버레이 URL을 관리하는 페이지.
+ *
+ * ── useCountdown (로컬 커스텀 훅) ─────────────────────────────────────────
+ *   missionEndTime(ISO 문자열)까지 남은 초를 1초 단위로 카운트다운한다.
+ *   setInterval 기반이며, 컴포넌트 언마운트 또는 missionEndTime 변경 시 클리어된다.
+ *   missionEndTime 이 없으면 remaining = -1 을 반환해 UI 가 타이머를 숨긴다.
+ *
+ * ── MissionCard (인라인 서브컴포넌트) ────────────────────────────────────
+ *   개별 미션 하나를 카드 형태로 렌더링한다.
+ *   status 에 따라 테두리 색상·아이콘·배지가 달라지며 getMissionStatusKind 로 판별한다.
+ *
+ * ── formatSeconds ─────────────────────────────────────────────────────────
+ *   초 단위 정수를 "mm:ss" 또는 "hh:mm:ss" 형식의 문자열로 변환하는 순수 함수.
+ *
+ * ── 초기 로드 (missionApi.list) ───────────────────────────────────────────
+ *   페이지 마운트 시 REST API 로 최대 200건의 미션 목록을 가져와 missionStore.setAll 로 저장한다.
+ *   이후 실시간 갱신은 useSocket 의 'mission' 이벤트 → missionStore.addOrUpdate 가 담당한다.
+ *
+ * ── overlayUrl ────────────────────────────────────────────────────────────
+ *   미션 오버레이는 localhost:3001 에 고정된 별도 경로에 서빙된다.
+ *   OBS 에서 직접 입력하는 Browser Source URL 을 복사 버튼으로 제공한다.
+ */
 import { useEffect, useState } from 'react'
 import { Target, CheckCircle2, XCircle, Clock, Coins, User, Trash2, Copy, Check } from 'lucide-react'
 import { useMissionStore, Mission } from '../store/missionStore'

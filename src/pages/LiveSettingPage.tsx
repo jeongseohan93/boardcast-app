@@ -1,3 +1,21 @@
+/**
+ * [방송 설정 페이지]
+ *
+ * 방송 제목, 카테고리(게임·컨텐츠 유형), 기타 채널 설정을 변경하는 페이지.
+ *
+ * ── 제목 히스토리 드롭다운 (titleHistory / historyRef) ──────────────────
+ *   이전에 사용한 방송 제목을 localStorage 에 저장하고,
+ *   제목 입력창 아래 드롭다운으로 재선택할 수 있다.
+ *   historyRef 는 드롭다운 외부 클릭 감지(mousedown) 에 사용한다.
+ *
+ * ── 카테고리 검색 (categoryApi.search) ──────────────────────────────────
+ *   검색어 입력 시 categoryApi.search 를 호출해 치지직 공식 카테고리 목록을 표시한다.
+ *   Category 인터페이스 필드 중 categoryValue 가 유저에게 표시되는 이름이다.
+ *
+ * ── liveApi.getSetting / updateSetting ───────────────────────────────────
+ *   getSetting  → 현재 방송 설정 불러오기 (페이지 마운트 시 호출)
+ *   updateSetting → 저장 버튼 클릭 시 Chzzk API 를 통해 제목·카테고리 업데이트
+ */
 import { useEffect, useState, useRef } from 'react'
 import { ChevronDown, Check, Search, Radio } from 'lucide-react'
 import { liveApi, categoryApi } from '../api/client'

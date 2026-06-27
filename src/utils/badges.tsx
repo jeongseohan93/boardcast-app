@@ -1,3 +1,26 @@
+/**
+ * [채팅 뱃지 유틸리티]
+ *
+ * 치지직 채팅 메시지의 뱃지(badges) 배열을 파싱해 <img> 또는 텍스트 스팬으로 렌더링하는 유틸 모듈.
+ *
+ * ── isSafeImageUrl ────────────────────────────────────────────────────────
+ *   뱃지 이미지 URL 이 안전한지 검증한다.
+ *   https:// 또는 http:// 로 시작하는 절대 URL 만 허용하고, 상대 경로·data URL 은 거부한다.
+ *   XSS 방지: 신뢰되지 않는 출처의 이미지 URL 이 <img src> 에 삽입되는 것을 방지한다.
+ *
+ * ── findImageUrl (재귀 탐색, 최대 깊이 4) ────────────────────────────────
+ *   뱃지 객체의 구조는 Chzzk API 버전마다 다를 수 있다.
+ *   image, icon, url, badge 키를 우선 탐색하고, 값이 없으면 중첩 객체를 재귀적으로 탐색한다.
+ *   최대 깊이를 4로 제한해 순환 참조나 과도하게 중첩된 객체로 인한 스택 오버플로를 방지한다.
+ *
+ * ── ChatBadges ────────────────────────────────────────────────────────────
+ *   badges 배열(unknown[])을 받아 각 뱃지를 <img> 또는 텍스트 <span> 으로 렌더링하는 컴포넌트.
+ *   findImageUrl 로 이미지 URL 을 찾으면 <img> 를, 없으면 TEXT_BADGE_LABELS 에서 레이블을 찾아 <span> 을 렌더링한다.
+ *   어느 쪽도 없으면 해당 뱃지는 건너뛴다.
+ *
+ * ── TEXT_BADGE_LABELS / TEXT_BADGE_COLORS ─────────────────────────────────
+ *   이미지가 없는 역할 뱃지(MANAGER, FAN_CLUB, STREAMER 등)에 대한 텍스트·색상 폴백 맵.
+ */
 type BadgeRecord = Record<string, unknown>
 
 const TEXT_BADGE_LABELS: Record<string, string> = {

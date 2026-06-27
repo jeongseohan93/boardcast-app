@@ -1,3 +1,23 @@
+/**
+ * [타이틀 바 컴포넌트]
+ *
+ * Electron 커스텀 타이틀 바. 최소화·최대화/복원·닫기 창 제어 버튼과 드래그 영역을 제공한다.
+ *
+ * ── -webkit-app-region: drag / no-drag ───────────────────────────────────
+ *   Electron 의 frameless 창에서 마우스 드래그로 창을 이동하려면
+ *   드래그 가능 영역에 `-webkit-app-region: drag` CSS 를 설정해야 한다.
+ *   버튼 영역은 `-webkit-app-region: no-drag` 로 드래그 예외 처리해야 클릭 이벤트가 동작한다.
+ *   이 CSS 는 Tailwind 클래스가 아닌 인라인 style 또는 커스텀 CSS 로만 설정 가능하다.
+ *
+ * ── 최대화 아이콘 전환 (Square ↔ Maximize2) ─────────────────────────────
+ *   maximized 상태에 따라 아이콘을 전환한다.
+ *   Square   → 최대화되지 않은 상태 (클릭 시 최대화)
+ *   Maximize2 → 최대화된 상태 (클릭 시 복원)
+ *
+ * ── electronAPI.onWindowMaximizeChange ────────────────────────────────────
+ *   Electron main 프로세스가 창 최대화 상태 변경을 IPC 로 알려주는 리스너.
+ *   사용자가 OS 레벨에서 창을 최대화/복원해도 아이콘이 동기화된다.
+ */
 import { useEffect, useState } from 'react'
 import { Minus, Square, X, Maximize2 } from 'lucide-react'
 

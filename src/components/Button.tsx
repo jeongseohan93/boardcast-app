@@ -1,3 +1,18 @@
+/**
+ * [공통 버튼 컴포넌트]
+ *
+ * 앱 전반에서 사용되는 기본 버튼 컴포넌트.
+ * variant 와 size 조합으로 다양한 스타일을 적용하고, HTML button 의 모든 props 를 그대로 지원한다.
+ *
+ * ── variantClass / sizeClass ──────────────────────────────────────────────
+ *   variant 와 size 를 key 로 갖는 lookup 객체를 통해 className 을 결정한다.
+ *   조건부 if/else 체인 대신 객체 조회 방식을 사용해 새 variant 추가가 간단하다.
+ *
+ * ── disabled:active:scale-100 ────────────────────────────────────────────
+ *   기본 active 상태에서는 scale(0.97) 클릭 애니메이션이 있지만,
+ *   disabled 상태에서는 scale 변환이 일어나지 않도록 `disabled:active:scale-100` 을 추가한다.
+ *   이 클래스가 없으면 disabled 버튼을 클릭했을 때도 눌린 느낌이 생긴다.
+ */
 import { ButtonHTMLAttributes, ReactNode } from 'react'
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
