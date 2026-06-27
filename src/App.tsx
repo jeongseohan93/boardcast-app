@@ -22,22 +22,12 @@ import TitleBar from './components/TitleBar'
 import ToastContainer from './components/ToastContainer'
 import OnboardingPage from './pages/OnboardingPage'
 import DashboardPage from './pages/DashboardPage'
-import BotPage from './pages/BotPage'
-import NoticePage from './pages/NoticePage'
-import VideoDonationPage from './pages/VideoDonationPage'
-import AlertHistoryPage from './pages/AlertHistoryPage'
-import FollowerListPage from './pages/FollowerListPage'
-import RestrictionPage from './pages/RestrictionPage'
-import RoulettePage from './pages/RoulettePage'
-import TamagotchiPage from './pages/TamagotchiPage'
-import EmotePartyPage from './pages/EmotePartyPage'
-import OverlayPage from './pages/OverlayPage'
-import OverlaySettingsPage from './pages/OverlaySettingsPage'
-import VotePage from './pages/VotePage'
-import SettingsPage from './pages/SettingsPage'
-import StatisticsPage from './pages/StatisticsPage'
+import BroadcastManagePage from './pages/BroadcastManagePage'
+import StreamSettingsPage from './pages/StreamSettingsPage'
+import ChannelPage from './pages/ChannelPage'
+import OverlayHubPage from './pages/OverlayHubPage'
 import PubgStatsPage from './pages/PubgStatsPage'
-import MissionPage from './pages/MissionPage'
+import SettingsPage from './pages/SettingsPage'
 import RawEventDebugPage from './pages/RawEventDebugPage'
 import { applyAppTheme, getStoredAppTheme } from './utils/appTheme'
 
@@ -71,26 +61,29 @@ function AppInner() {
     <Layout>
       <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/bot"       element={<BotPage />} />
-        <Route path="/notice" element={<NoticePage />} />
-        <Route path="/video-donation" element={<VideoDonationPage />} />
-        <Route path="/chat" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/live" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/history" element={<AlertHistoryPage />} />
-        <Route path="/followers" element={<FollowerListPage />} />
-        <Route path="/restrictions" element={<RestrictionPage />} />
-        <Route path="/roulette" element={<RoulettePage />} />
-        <Route path="/tamagotchi" element={<TamagotchiPage />} />
-        <Route path="/emote-party" element={<EmotePartyPage />} />
-        <Route path="/overlay" element={<OverlayPage />} />
-        <Route path="/overlay-settings" element={<OverlaySettingsPage />} />
-        <Route path="/mission" element={<MissionPage />} />
-        <Route path="/vote" element={<VotePage />} />
-        <Route path="/pubg" element={<PubgStatsPage />} />
-        <Route path="/statistics" element={<StatisticsPage />} />
-        <Route path="/debug-events" element={<RawEventDebugPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/dashboard"       element={<DashboardPage />} />
+        <Route path="/broadcast"       element={<BroadcastManagePage />} />
+        <Route path="/stream-settings" element={<StreamSettingsPage />} />
+        <Route path="/channel"         element={<ChannelPage />} />
+        <Route path="/overlay-hub"     element={<OverlayHubPage />} />
+        <Route path="/pubg"            element={<PubgStatsPage />} />
+        <Route path="/debug-events"    element={<RawEventDebugPage />} />
+        <Route path="/settings"        element={<SettingsPage />} />
+        {/* 기존 URL 호환 */}
+        <Route path="/bot"             element={<Navigate to="/stream-settings" replace />} />
+        <Route path="/history"         element={<Navigate to="/stream-settings" replace />} />
+        <Route path="/roulette"        element={<Navigate to="/stream-settings" replace />} />
+        <Route path="/followers"       element={<Navigate to="/stream-settings" replace />} />
+        <Route path="/emote-party"     element={<Navigate to="/stream-settings" replace />} />
+        <Route path="/tamagotchi"      element={<Navigate to="/stream-settings" replace />} />
+        <Route path="/notice"          element={<Navigate to="/broadcast" replace />} />
+        <Route path="/mission"         element={<Navigate to="/broadcast" replace />} />
+        <Route path="/vote"            element={<Navigate to="/broadcast" replace />} />
+        <Route path="/video-donation"  element={<Navigate to="/broadcast" replace />} />
+        <Route path="/statistics"      element={<Navigate to="/channel" replace />} />
+        <Route path="/restrictions"    element={<Navigate to="/channel" replace />} />
+        <Route path="/overlay"         element={<Navigate to="/overlay-hub" replace />} />
+        <Route path="/overlay-settings" element={<Navigate to="/overlay-hub" replace />} />
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
     </Layout>

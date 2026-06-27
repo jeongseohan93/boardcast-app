@@ -2,61 +2,26 @@ import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard,
-  Bot,
-  Bell,
-  Users,
-  CircleDot,
-  Sparkles,
-  PartyPopper,
-  Monitor,
+  Radio,
   SlidersHorizontal,
-  Vote,
+  Monitor,
   Gamepad2,
   BarChart2,
   Settings,
   ChevronsLeft,
   ChevronsRight,
-  ShieldBan,
-  Megaphone,
-  Clapperboard,
-  Target,
 } from 'lucide-react'
 
 const NAV_GROUPS = [
   {
-    title: '방송',
+    title: '',
     items: [
-      { to: '/dashboard', icon: LayoutDashboard, label: '방송 관리' },
-      { to: '/notice', icon: Megaphone, label: '공지 작성' },
-      { to: '/video-donation', icon: Clapperboard, label: '영도 관리' },
-      { to: '/mission', icon: Target, label: '미션' },
-      { to: '/vote', icon: Vote, label: '투표' },
-    ],
-  },
-  {
-    title: '채널 관리',
-    items: [
-      { to: '/history', icon: Bell, label: '알림 기록' },
-      { to: '/statistics', icon: BarChart2, label: '통계' },
-      { to: '/followers', icon: Users, label: '팔로우 목록' },
-      { to: '/restrictions', icon: ShieldBan, label: '활동 제한' },
-      { to: '/bot', icon: Bot, label: '봇 설정' },
-    ],
-  },
-  {
-    title: '참여 도구',
-    items: [
-      { to: '/roulette', icon: CircleDot, label: '룰렛' },
-      { to: '/tamagotchi', icon: Sparkles, label: '다마고치' },
-      { to: '/emote-party', icon: PartyPopper, label: '이모티콘 파티' },
-      { to: '/pubg', icon: Gamepad2, label: '배틀그라운드 전적' },
-    ],
-  },
-  {
-    title: '오버레이',
-    items: [
-      { to: '/overlay', icon: Monitor, label: '오버레이 URL' },
-      { to: '/overlay-settings', icon: SlidersHorizontal, label: '오버레이 설정' },
+      { to: '/dashboard',       icon: LayoutDashboard,  label: '대시보드' },
+      { to: '/broadcast',       icon: Radio,            label: '방송 관리' },
+      { to: '/stream-settings', icon: SlidersHorizontal,label: '방송 설정' },
+      { to: '/channel',         icon: BarChart2,         label: '채널 분석' },
+      { to: '/overlay-hub',     icon: Monitor,           label: '오버레이' },
+      { to: '/pubg',            icon: Gamepad2,          label: '배그 전적' },
     ],
   },
 ]
