@@ -282,7 +282,70 @@ function getSettings() {
     .catch(() => _settings || {})
 }
 
+/* ── 후원 TTS: Web Speech API 큐 시스템 ── */
+let _ttsSettings    = null
+let _ttsSettingsAt  = 0
+const _ttsQueue     = []
+let _ttsBusy        = false
+
+function getTtsSettings() {
+  if (_ttsSettings && Date.now() - _ttsSettingsAt < SETTINGS_TTL) return Promise.resolve(_ttsSettings)
+  return fetch('/api/tts-donation/settings')
+    .then(r => r.ok ? r.json() : Promise.reject(new Error('non-ok')))
+    .then(d => { _ttsSettings = d; _ttsSettingsAt = Date.now(); return d })
+    .catch(() => _ttsSettings)   // 에러 시 기존 캐시 반환, 타임스탬프 갱신 안 함 → 즉시 재시도 가능
+}
+
+function runTtsQueue() {
+  if (!_ttsQueue.length) { _ttsBusy = false; return }
+  _ttsBusy = true
+  const { text, rate, pitch, volume } = _ttsQueue.shift()
+  try {
+    const utter    = new SpeechSynthesisUtterance(text)
+    utter.lang     = 'ko-KR'
+    utter.rate     = Math.max(0.1, Math.min(10, rate  || 1.0))
+    utter.pitch    = Math.max(0,   Math.min(2,  pitch || 1.0))
+    utter.volume   = Math.max(0,   Math.min(1,  volume|| 1.0))
+    utter.onend    = runTtsQueue
+    utter.onerror  = runTtsQueue
+    speechSynthesis.speak(utter)
+  } catch { runTtsQueue() }
+}
+
+function enqueueTts(text, rate, pitch, volume) {
+  if (!('speechSynthesis' in window) || !text) return
+  _ttsQueue.push({ text, rate, pitch, volume })
+  if (!_ttsBusy) runTtsQueue()
+}
+
+async function tryTts(data) {
+  try {
+    const s = await getTtsSettings()
+    if (!s?.enabled) return
+    if (Number(data.amount || 0) < (s.minAmount || 0)) return
+    const msg = (data.message || '').trim()
+    if (s.skipNoMessage && !msg) return
+
+    const text = (s.template || '{nickname}님 {amount}치즈 후원! {message}')
+      .replace(/\{nickname\}/g, data.nickname || '')
+      .replace(/\{amount\}/g,   Number(data.amount || 0).toLocaleString())
+      .replace(/\{message\}/g,  msg)
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+
+    if (text) enqueueTts(text, s.rate, s.pitch, s.volume)
+  } catch {}
+}
+
 async function showAlert(data) {
+  if (typeof data.soundDataUrl === 'string' && data.soundDataUrl) {
+    try {
+      const audio = new Audio(data.soundDataUrl)
+      audio.volume = typeof data.soundVolume === 'number' ? Math.max(0, Math.min(1, data.soundVolume)) : 1
+      audio.play().catch(() => {})
+    } catch {}
+  }
+
   const cfg = await getSettings()
   const ds  = (cfg && cfg.donation) ? cfg.donation : {}
 
@@ -318,6 +381,8 @@ async function showAlert(data) {
   if (showMs > 0) {
     setTimeout(() => dismiss(el), showMs)
   }
+
+  tryTts(data)  // fire-and-forget: 큐에 넣고 반환
 }
 
 function dismiss(el) {

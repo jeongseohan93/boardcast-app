@@ -1,3 +1,23 @@
+/**
+ * [공지 페이지]
+ *
+ * 방송 채팅에 공지(Megaphone)를 전송하고, 자주 쓰는 공지 템플릿을 관리하는 페이지.
+ *
+ * ── STORAGE_KEY = 'noticeTemplates' ──────────────────────────────────────
+ *   템플릿 목록은 서버 DB 가 아닌 브라우저 localStorage 에 저장된다.
+ *   loadTemplates / saveTemplates 헬퍼가 JSON 직렬화·역직렬화를 담당한다.
+ *
+ * ── MAX_NOTICE_LENGTH = 100 ────────────────────────────────────────────────
+ *   Chzzk 공지 API 의 최대 글자 수 제한. 초과 시 전송 버튼이 비활성화된다.
+ *
+ * ── previewLines 제한 (3줄) ───────────────────────────────────────────────
+ *   템플릿 카드 미리보기는 최대 3줄까지만 표시한다.
+ *   전체 내용은 템플릿 선택 후 입력창에서 확인할 수 있다.
+ *
+ * ── 템플릿 최대 개수 (20개) ──────────────────────────────────────────────
+ *   템플릿 저장 시 20개를 초과하면 추가를 차단하고 토스트로 안내한다.
+ *   로컬 스토리지 용량 제한과 UI 스크롤 부담을 고려한 임계치.
+ */
 import { useEffect, useMemo, useState } from 'react'
 import { Copy, Megaphone, Plus, Send, Star, Trash2 } from 'lucide-react'
 import { chatApi } from '../api/client'

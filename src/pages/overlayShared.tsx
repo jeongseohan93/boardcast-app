@@ -1,4 +1,43 @@
-
+/**
+ * [오버레이 공유 모듈]
+ *
+ * 여러 오버레이 페이지(OverlayPage, OverlaySettingsPage, EmotePartyPage 등)에서
+ * 공통으로 사용하는 타입·상수·유틸·미니 프리뷰 컴포넌트를 모아둔 공유 모듈.
+ *
+ * ── 인터페이스 구조 ──────────────────────────────────────────────────────
+ *   ThemeDef        → 개별 테마(id, name, desc) 정의
+ *   OverlayDef      → 오버레이 종류 정의 (key, label, path, 테마 목록 등)
+ *   ChatOvSettings  → 채팅 오버레이 설정 (폰트 크기, 최대 메시지 수, 페이드 시간 등)
+ *   AlertOvSettings → 후원·팔로우 알림 오버레이 공통 설정
+ *   EmoteOvSettings → 이모트 파티 오버레이 설정 (크기, 중력, 퍼짐도 등)
+ *   AvachatOvSettings → 아바챗 오버레이 설정 (슬롯별 이미지 URL, 크기)
+ *   AllOvSettings   → 위 설정들을 하나로 묶은 최상위 타입
+ *
+ * ── DEFAULT_OV_SETTINGS ──────────────────────────────────────────────────
+ *   모든 오버레이 설정의 기본값. buildOverlayUrl 이 기본값과 다른 설정만 URL 파라미터로 추가하는데
+ *   이 상수를 비교 기준으로 사용한다.
+ *
+ * ── buildOverlayUrl ──────────────────────────────────────────────────────
+ *   오버레이 경로 + 현재 설정 → OBS Browser Source URL 을 생성하는 순수 함수.
+ *   기본값과 동일한 설정은 파라미터에서 제외해 URL 을 최대한 짧게 유지한다.
+ *   이렇게 하면 OBS 에 입력할 URL 이 깔끔하고, 재현 가능성이 높아진다.
+ *
+ * ── PW / PH (미리보기 원본 크기) ─────────────────────────────────────────
+ *   PW=156, PH=88 은 미리보기 컨테이너의 고정 크기(px).
+ *   실제 오버레이(1920×1080)를 이 크기로 scale() 변환해 iframe 미리보기에 적용한다.
+ *
+ * ── CL (색상 단축 상수) ───────────────────────────────────────────────────
+ *   미니 프리뷰 컴포넌트에서 반복 사용되는 Tailwind 색상 클래스를 짧은 키로 매핑한 객체.
+ *   코드 중복을 줄이고 색상 일관성을 유지하기 위한 내부 상수.
+ *
+ * ── StreamPreviewCard ────────────────────────────────────────────────────
+ *   오버레이 미리보기 iframe 을 감싸는 카드 컴포넌트.
+ *   scale transform 으로 1920×1080 오버레이를 PW×PH 미리보기 영역에 맞춰 축소 표시한다.
+ *
+ * ── 미니 프리뷰 컴포넌트 (DonationMini / FollowMini / ChatMini / EmoteMini / AvachatMini) ─
+ *   각 오버레이 유형별로 실제 오버레이와 유사한 모양의 SVG/HTML 미리보기를 렌더링한다.
+ *   실제 iframe 로드 없이 순수 React 로 렌더링해 설정 변경 시 즉각 반응하도록 한다.
+ */
 export interface ThemeDef { id: number; name: string; desc: string }
 export interface OverlayDef {
   key: string

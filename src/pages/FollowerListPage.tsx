@@ -1,3 +1,23 @@
+/**
+ * [팔로워 목록 페이지]
+ *
+ * 채널의 팔로워 목록을 검색·조회하고, 특정 유저에 대한 활동제한을 토글할 수 있는 페이지.
+ *
+ * ── restrictionIdsFromResponse ────────────────────────────────────────────
+ *   활동제한 API 응답은 버전에 따라 배열 또는 { data: [] } 객체 두 형태로 올 수 있다.
+ *   이 헬퍼가 두 형태 모두를 Set<string> 으로 정규화해 컴포넌트 코드를 단순하게 유지한다.
+ *
+ * ── LIMIT = 50 ────────────────────────────────────────────────────────────
+ *   한 페이지에 최대 50명을 로드한다. 서버 부하를 고려한 값으로, 변경 시 페이지네이션 계산도 함께 조정해야 한다.
+ *
+ * ── 검색 (query 상태) ─────────────────────────────────────────────────────
+ *   입력값이 변경될 때마다 서버 API 를 통해 검색한다.
+ *   query 가 빈 문자열이면 전체 목록을 로드한다.
+ *
+ * ── RestrictionButton (인라인 서브컴포넌트) ──────────────────────────────
+ *   팔로워 행마다 활동제한/해제 버튼 렌더링 책임을 분리한 최소 단위 컴포넌트.
+ *   isRestricted 여부에 따라 ShieldCheck(초록) / ShieldBan(빨강) 아이콘을 전환한다.
+ */
 import { useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, RefreshCw, Search, ShieldBan, ShieldCheck, Users } from 'lucide-react'
 import { channelApi, eventsApi } from '../api/client'

@@ -1,3 +1,25 @@
+/**
+ * [로우 이벤트 디버그 페이지]
+ *
+ * 서버에서 수신하는 원시(raw) 소켓 이벤트를 실시간으로 확인하는 개발자 디버그 페이지.
+ *
+ * ── 독립 Socket.IO 연결 ────────────────────────────────────────────────────
+ *   useSocket 싱글턴과는 별도로 이 페이지 전용 Socket.IO 인스턴스를 생성한다.
+ *   디버그 이벤트(debug:sessionRaw, debug:internalDonationRaw)는 useSocket 이 구독하지 않으므로
+ *   별도 연결이 필요하다. 페이지 언마운트 시 disconnect() 해 리소스를 해제한다.
+ *
+ * ── MISSION_EVENTS Set ────────────────────────────────────────────────────
+ *   미션 관련 소켓 이벤트 이름 집합. has() 로 O(1) 조회해 이벤트 유형별 탭 분류에 활용한다.
+ *
+ * ── 4개 탭 구조 ──────────────────────────────────────────────────────────
+ *   session  → debug:sessionRaw 이벤트: Chzzk 로그인 세션 원시 데이터
+ *   donation → 후원 관련 이벤트 원시 페이로드
+ *   webhook  → 웹훅 수신 이벤트 (팔로우, 구독 등)
+ *   internal → debug:internalDonationRaw 이벤트: 내부 후원 처리 파이프라인 데이터
+ *
+ * ── 트리 뷰 (JSON 접기/펼치기) ───────────────────────────────────────────
+ *   각 이벤트 페이로드는 계층적 트리 뷰로 표시되며, 클릭으로 중첩 객체를 접거나 펼칠 수 있다.
+ */
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { RefreshCw, Trash2, ChevronDown, ChevronRight, Wifi, WifiOff } from 'lucide-react'
 import { eventsApi } from '../api/client'

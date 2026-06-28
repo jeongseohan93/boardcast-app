@@ -1,3 +1,27 @@
+/**
+ * [채팅 페이지]
+ *
+ * 실시간 채팅 메시지를 표시하고, 채팅 송신·봇 명령어·채팅 모더레이션을 수행하는 메인 채팅 UI.
+ *
+ * ── 닉네임 색상 (getNickColor / colorCache) ──────────────────────────────
+ *   닉네임 문자열로부터 결정론적 해시를 계산해 NICK_COLORS 배열에서 색상을 선택한다.
+ *   Map 기반 캐시(colorCache)로 동일 닉네임은 한 번만 계산하고 이후에는 캐시를 반환한다.
+ *   이렇게 하면 리렌더링마다 색상이 바뀌지 않아 시각적으로 안정적이다.
+ *
+ * ── canUseChatAction ─────────────────────────────────────────────────────
+ *   채팅 모더레이션(임시차단·블라인드)은 chatChannelId 가 있어야 Chzzk API 호출이 가능하다.
+ *   chatChannelId 없이 버튼이 활성화되면 요청 자체가 실패하므로 이 플래그로 UI를 비활성화한다.
+ *
+ * ── 모더레이션 ContextMenu (ChatBubble 내부) ─────────────────────────────
+ *   말풍선 우상단 ⋮ 버튼 클릭 시 MoreVertical 메뉴가 열린다.
+ *   temporary  → 채팅 임시차단 (chatChannelId 필수)
+ *   blind      → 메시지 블라인드 (chatChannelId 필수)
+ *   restrict   → 활동제한 (채널 ID 기반, chatChannelId 불필요)
+ *
+ * ── 자동 스크롤 (scrollRef / isAtBottom) ────────────────────────────────
+ *   isAtBottom 이 true 일 때만 새 메시지 수신 시 scrollIntoView를 호출해 맨 아래로 이동한다.
+ *   사용자가 위로 스크롤 중이면 chatStore 의 unread 카운터가 올라가 배지로 표시된다.
+ */
 import { useEffect, useRef, useState } from 'react'
 import { Send, Plus, Trash2, Check, X, MessageSquare, Bot, Megaphone, MoreVertical, ShieldBan, EyeOff, Clock } from 'lucide-react'
 import { chatApi, botApi, channelApi } from '../api/client'

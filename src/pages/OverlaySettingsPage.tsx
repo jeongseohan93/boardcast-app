@@ -1,3 +1,26 @@
+/**
+ * [오버레이 설정 페이지]
+ *
+ * 채팅·후원 알림·팔로우 알림·아바챗 오버레이의 세부 스타일을 편집하는 설정 페이지.
+ *
+ * ── 탭 구조 (Tab = 'chat' | 'donation' | 'follow' | 'avachat') ────────────
+ *   탭별로 서로 다른 설정 컴포넌트를 렌더링하며, 오버레이 경로(path)와 테마 목록도 탭마다 다르다.
+ *
+ * ── iframe 미리보기 + ResizeObserver 스케일링 ──────────────────────────
+ *   설정 패널 오른쪽에 실제 오버레이를 iframe 으로 미리 보여준다.
+ *   오버레이의 원본 크기(1920×1080)를 미리보기 컨테이너 크기에 맞게 CSS scale() 로 축소한다.
+ *   ResizeObserver 가 컨테이너 크기 변화를 감지해 scale 값을 동적으로 재계산한다.
+ *
+ * ── 이미지 업로드 (base64 data URL, PNG/GIF 최대 8MB) ──────────────────
+ *   배경 이미지는 <input type="file"> 를 통해 선택하고 FileReader 로 base64 인코딩한다.
+ *   서버 업로드 없이 base64 문자열 자체를 설정 값으로 저장하므로 오프라인에서도 동작한다.
+ *   8MB 초과 시 토스트 에러를 표시하고 저장을 차단한다.
+ *
+ * ── avachatSlotRef ────────────────────────────────────────────────────────
+ *   아바챗은 슬롯(slot1~slot4) 단위로 이미지를 각각 설정한다.
+ *   이미지 파일 선택 다이얼로그가 열리기 전에 어느 슬롯에 저장할지 ref 로 기억해둔다.
+ *   단일 hidden <input> 을 재사용하는 방식이라 다이얼로그가 열릴 때 slotRef 값을 확인해야 한다.
+ */
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { SlidersHorizontal, RotateCcw, Play, Monitor, Image, Upload, X, ChevronDown, Info, Bell } from 'lucide-react'
 import { api } from '../api/client'
@@ -7,14 +30,18 @@ import {
   AllOvSettings, ChatOvSettings, AlertOvSettings, AvachatOvSettings,
   StreamPreviewCard,
 } from './overlayShared'
+import DonationRulesPage from './DonationRulesPage'
+import TtsDonationPage from './TtsDonationPage'
 
-type Tab = 'chat' | 'donation' | 'follow' | 'avachat'
+type Tab = 'chat' | 'donation' | 'follow' | 'avachat' | 'rules' | 'tts'
 
 const TABS: { key: Tab; label: string; path: string; themes: typeof CHAT_THEMES }[] = [
   { key: 'chat',     label: '채팅',        path: '/overlay/chat',     themes: CHAT_THEMES     },
   { key: 'donation', label: '후원 알림',    path: '/overlay/donation', themes: DONATION_THEMES },
   { key: 'follow',   label: '팔로우 알림',  path: '/overlay/follow',   themes: FOLLOW_THEMES   },
   { key: 'avachat',  label: '아바타 채팅',  path: '/overlay/avachat',  themes: []              },
+  { key: 'rules',    label: '금액별 규칙',  path: '',                  themes: []              },
+  { key: 'tts',      label: '후원 TTS',    path: '',                  themes: []              },
 ]
 
 const PRESET_COLORS = ['#00FFA3','#A78BFA','#60A5FA','#F472B6','#FFD166','#FB923C','#EF4444','#ffffff']
@@ -317,8 +344,22 @@ export default function OverlaySettingsPage() {
         ))}
       </div>
 
-      {/* 테마 설정 섹션 */}
-      <div className="shrink-0 border-b border-border bg-bg-card">
+      {/* 금액별 규칙 탭 — 별도 레이아웃으로 전환 */}
+      {activeTab === 'rules' && (
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <DonationRulesPage />
+        </div>
+      )}
+
+      {/* 후원 TTS 탭 — 별도 레이아웃으로 전환 */}
+      {activeTab === 'tts' && (
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <TtsDonationPage />
+        </div>
+      )}
+
+      {/* 테마·본문 영역 (rules/tts 탭에서는 해당 페이지가 대신 렌더링) */}
+      {activeTab !== 'rules' && activeTab !== 'tts' && <div className="shrink-0 border-b border-border bg-bg-card">
         <button
           onClick={() => setThemeOpen((v) => !v)}
           className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/[0.02] transition-colors"
@@ -375,10 +416,10 @@ export default function OverlaySettingsPage() {
             )}
           </div>
         )}
-      </div>
+      </div>}
 
-      {/* 본문 2단 */}
-      <div className="flex-1 flex min-h-0 overflow-hidden">
+      {/* 본문 2단 (rules/tts 탭에서는 숨김) */}
+      {activeTab !== 'rules' && activeTab !== 'tts' && <div className="flex-1 flex min-h-0 overflow-hidden">
 
         {/* 좌: 표시 설정 */}
         <div className="flex-1 flex flex-col min-h-0 border-r border-border overflow-hidden min-w-0">
@@ -800,7 +841,7 @@ export default function OverlaySettingsPage() {
 
         </div>
 
-      </div>
+      </div>}
     </div>
   )
 }

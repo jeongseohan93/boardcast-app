@@ -1,3 +1,28 @@
+/**
+ * [영상 후원 페이지]
+ *
+ * 시청자가 후원한 유튜브·트위치 영상 링크를 대기열(queue)로 관리하고,
+ * 오버레이에서 순서대로 재생을 제어하는 페이지.
+ *
+ * ── 독립 Socket.IO 연결 ────────────────────────────────────────────────────
+ *   useSocket 싱글턴과 별도로 이 페이지 전용 Socket.IO 인스턴스를 생성한다.
+ *   'videoDonation:queue' 이벤트를 구독해 서버에서 큐 상태가 변경될 때마다 목록을 갱신한다.
+ *   페이지 언마운트 시 disconnect() 해 리소스를 해제한다.
+ *
+ * ── run() 헬퍼 ────────────────────────────────────────────────────────────
+ *   재생·일시정지·건너뛰기 등의 제어 API 호출을 공통 래핑하는 함수.
+ *   busy 상태를 설정해 중복 클릭을 방지하고, 완료 후 목록을 다시 불러온다.
+ *
+ * ── STATUS_STYLE / STATUS_LABEL ──────────────────────────────────────────
+ *   영상 대기열 아이템 상태(pending / playing / played / rejected)를 UI 색상·레이블로 매핑.
+ *   Record 타입으로 모든 상태 변형을 빠짐없이 커버한다.
+ *
+ * ── 설정 (VideoDonationConfig) ────────────────────────────────────────────
+ *   enabled   → 영상 후원 기능 활성화 여부
+ *   minAmount → 최소 후원 치즈 수 (미달 시 자동 거절)
+ *   autoPlay  → 대기열에 추가되면 자동으로 재생 시작
+ *   maxSeconds → 영상 최대 재생 시간(초)
+ */
 import { useEffect, useRef, useState } from 'react'
 import { Clapperboard, Copy, PauseCircle, Play, RefreshCw, Send, Settings2, Trash2, X } from 'lucide-react'
 import { videoDonationApi } from '../api/client'

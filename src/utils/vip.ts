@@ -1,3 +1,21 @@
+/**
+ * [VIP 등급 유틸리티]
+ *
+ * 후원 누적 치즈 금액을 기준으로 VIP 등급을 결정하는 유틸 모듈.
+ *
+ * ── VIP_TIERS (내림차순 정렬) ─────────────────────────────────────────────
+ *   diamond(10만) → gold(5만) → silver(1만) → bronze(1천) 순으로 내림차순 정렬되어 있다.
+ *   getVipTier 가 Array.find() 를 사용하므로 첫 번째 매칭이 가장 높은 등급이 된다.
+ *   오름차순으로 정렬하면 항상 bronze 가 매칭되어버리기 때문에 내림차순이 필수다.
+ *
+ * ── getVipTier ────────────────────────────────────────────────────────────
+ *   누적 치즈 금액(totalCheese)을 받아 해당하는 VipTier 를 반환한다.
+ *   어떤 등급도 해당하지 않으면(1천 미만) null 을 반환해 뱃지를 표시하지 않는다.
+ *
+ * ── badgeClass / rowClass / nameClass ────────────────────────────────────
+ *   각 등급별로 ChatPage 뱃지·행·닉네임에 적용할 Tailwind CSS 클래스를 포함한다.
+ *   컴포넌트에서 조건부 className 계산 없이 tier 객체만 참조하면 스타일이 결정된다.
+ */
 export interface VipTier {
   key: 'none' | 'bronze' | 'silver' | 'gold' | 'diamond'
   label: string

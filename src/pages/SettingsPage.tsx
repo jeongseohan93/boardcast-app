@@ -1,3 +1,29 @@
+/**
+ * [설정 페이지]
+ *
+ * 앱 전반의 환경설정(OAuth 자격증명, 테마, DB 관리)을 수행하는 페이지.
+ *
+ * ── clientSecret (password input) ────────────────────────────────────────
+ *   Client Secret 은 비밀값이므로 type="password" 로 렌더링한다.
+ *   절대로 값을 콘솔에 출력하거나 로그에 기록하지 말 것.
+ *
+ * ── DB 내보내기 (Blob + URL.createObjectURL) ─────────────────────────────
+ *   서버에서 SQLite DB 파일을 ArrayBuffer 로 받아 Blob 을 생성한 뒤,
+ *   임시 <a> 태그를 생성해 다운로드 트리거 후 revokeObjectURL 로 메모리를 해제한다.
+ *
+ * ── 파괴적 작업 확인 (window.confirm) ────────────────────────────────────
+ *   로그아웃, DB 초기화 등 되돌릴 수 없는 동작 전에 반드시 confirm() 확인 대화상자를 띄운다.
+ *   사용자 실수를 방지하기 위한 최소한의 안전장치.
+ *
+ * ── importInputRef (숨겨진 file input) ──────────────────────────────────
+ *   DB 가져오기 버튼 클릭 → ref 를 통해 hidden <input type="file"> 를 프로그래밍적으로 클릭한다.
+ *   실제 파일 선택 UI 를 직접 트리거하면서도 버튼 스타일을 자유롭게 커스텀할 수 있다.
+ *
+ * ── 앱 테마 (appTheme) ────────────────────────────────────────────────────
+ *   APP_THEMES 배열에서 테마를 선택하면 applyAppTheme 이 document.documentElement 에
+ *   data-app-theme 어트리뷰트를 설정해 CSS 변수를 즉시 전환한다.
+ *   선택한 테마는 localStorage 에도 저장돼 앱 재시작 후에도 유지된다.
+ */
 import { useState, useEffect, useRef } from 'react'
 import { ExternalLink, LogOut, Trash2, AlertTriangle, Settings, User, Palette, Database, Download, Upload, Wrench } from 'lucide-react'
 import { authApi, eventsApi } from '../api/client'

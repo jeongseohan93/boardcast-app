@@ -1,3 +1,24 @@
+/**
+ * [온보딩 페이지]
+ *
+ * 최초 설치 후 Chzzk OAuth 인증을 완료하기 위한 단계별 가이드 페이지.
+ *
+ * ── STEPS 배열 ────────────────────────────────────────────────────────────
+ *   3단계 안내 텍스트를 순서대로 표시한다.
+ *   각 단계는 순차적으로 수행해야 하며, 번호 배지로 진행 상태를 시각화한다.
+ *
+ * ── OAuth 흐름 (electronAPI.onOAuthCode + openOAuthWindow) ────────────────
+ *   1. "치지직 계정 연결" 버튼 → openOAuthWindow 로 Chzzk 인증 팝업 열기
+ *   2. 인증 완료 후 리다이렉트 → Electron main 이 code 를 캡처해 onOAuthCode 콜백으로 전달
+ *   3. code 수신 → authApi.callback 호출 → 서버에서 토큰 저장
+ *
+ *   ⚠️  보안: OAuth state 와 authorization code 를 절대 콘솔에 출력하지 말 것.
+ *   이 값들이 노출되면 인증 코드 가로채기(Authorization Code Interception) 공격에 취약해진다.
+ *
+ * ── clientSecret 입력 (password type) ────────────────────────────────────
+ *   Client Secret 은 비밀값이므로 <input type="password"> 로 렌더링해 화면에 노출되지 않도록 한다.
+ *   절대로 입력값을 로그에 출력하지 말 것.
+ */
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ExternalLink, CheckCircle } from 'lucide-react'

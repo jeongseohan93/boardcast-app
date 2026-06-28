@@ -37,6 +37,9 @@ import votingRouter from './routes/voting'
 import pubgRouter, { initPubgTracking } from './routes/pubg'
 import videoDonationRouter from './routes/videoDonation'
 import missionRouter from './routes/mission'
+import attendanceRouter from './routes/attendance'
+import donationAlertRouter from './routes/donationAlert'
+import ttsDonationRouter from './routes/ttsDonation'
 import { setupSocket } from './socket/index'
 import { ChzzkSession } from './services/chzzkSession'
 import { PollService } from './services/pollService'
@@ -285,6 +288,9 @@ export async function startExpressServer(port: number) {
   app.use('/api/pubg', pubgRouter)
   app.use('/api/video-donation', videoDonationRouter)
   app.use('/api/mission', missionRouter)
+  app.use('/api/attendance', attendanceRouter)
+  app.use('/api/donation-alert', donationAlertRouter)
+  app.use('/api/tts-donation', ttsDonationRouter)
 
   initPubgTracking()
 

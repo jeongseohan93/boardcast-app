@@ -1,3 +1,25 @@
+/**
+ * [이모트 파티 페이지]
+ *
+ * 채팅 이모트(이모티콘)가 화면 위로 날아오르는 파티 오버레이의 설정·미리보기 페이지.
+ *
+ * ── Slider (로컬 서브컴포넌트) ──────────────────────────────────────────
+ *   이 파일에서만 사용하는 범용 슬라이더 UI 컴포넌트.
+ *   label, min/max/step, 현재 value, 표시용 display 문자열, onChange 를 props 로 받는다.
+ *   display 를 별도 prop 으로 분리한 이유: 값이 숫자여도 단위(px, %, x 등)를 붙여 표시해야 하기 때문.
+ *
+ * ── EMOTE_THEMES ──────────────────────────────────────────────────────────
+ *   overlayShared.tsx 에서 import 한 테마 목록.
+ *   테마 선택에 따라 오버레이 URL 파라미터가 달라지고, OBS Browser Source 에 반영된다.
+ *
+ * ── saveTheme ─────────────────────────────────────────────────────────────
+ *   설정은 electronAPI.store.set 을 통해 Electron 의 영구 스토리지에 저장된다.
+ *   앱 재시작 후에도 마지막으로 설정한 gravity/spread/maxParts/size 가 유지된다.
+ *
+ * ── 네트워크 IP (buildOverlayUrl / /api/network-info) ────────────────────
+ *   OBS 가 localhost 가 아닌 별도 PC에서 실행될 때를 위해 로컬 IP를 자동 감지한다.
+ *   IP 감지 실패 시 localhost 를 폴백으로 사용한다.
+ */
 import { useEffect, useState } from 'react'
 import { Copy, Monitor, PartyPopper, Play, RotateCcw, SlidersHorizontal, Wifi } from 'lucide-react'
 import { api } from '../api/client'

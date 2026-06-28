@@ -300,6 +300,25 @@ export class ChzzkSession {
             : new Date().toISOString(),
         })
 
+        // ── 출석 체크 처리 ───────────────────────────────────────────────────────
+        const { getAttendanceSettings, processAttendance, buildReply, matchesAttendanceKeyword } = require('./attendanceService')
+        const attSettings = getAttendanceSettings()
+        if (
+          attSettings.enabled &&
+          attSettings.keyword &&
+          matchesAttendanceKeyword(msg, attSettings.keyword)
+        ) {
+          const result = processAttendance(this.channelId, nickname, userId)
+          if (!result.alreadyChecked) {
+            this.io.emit('attendance', { nickname, count: result.count, isNew: result.isNew })
+            const reply = buildReply(attSettings.replyTemplate, nickname, result.count)
+            const { sendChat } = require('../services/chzzkApi')
+            sendChat(this.accessToken, reply, this.clientId).catch((e: unknown) => {
+              console.error('[Attendance] sendChat failed:', e)
+            })
+          }
+        }
+
         // ── 투표 커맨드 처리 ─────────────────────────────────────────────────────
         const { startPoll, stopPoll, vote, isActive, getVoteState } = require('./votingService')
 
@@ -394,9 +413,19 @@ export class ChzzkSession {
           console.error('[Roulette] Trigger check failed:', e)
         }
 
-        // 룰렛이 발동되지 않은 경우에만 채팅 후원 오버레이 표시
         if (!rouletteTriggered) {
-          this.io.emit('donation', event)
+          const { matchDonationAlertRule } = require('./donationAlertService')
+          const rule = matchDonationAlertRule(amount)
+          // rule 없으면 미디어 필드 생략 → donation.html이 전역 오버레이 설정으로 폴백
+          this.io.emit('donation', {
+            ...event,
+            ...(rule ? {
+              imageDataUrl: rule.imageDataUrl,
+              imageSize: rule.imageSize,
+              soundDataUrl: rule.soundDataUrl,
+              soundVolume: rule.soundVolume,
+            } : {}),
+          })
         }
 
         // 영상 후원은 금액/룰렛과 무관하게 YouTube 링크 여부로 독립 처리
