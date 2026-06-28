@@ -23,16 +23,25 @@
  * ── matchesAttendanceKeyword (유연한 키워드 매칭) ─────────────────────────
  *   한국 인터넷 문화에서 키워드를 창의적으로 변형해 입력하는 패턴을 처리한다.
  *
- *   지원하는 변형:
- *   1. 정확히 일치  : "제하"
- *   2. to the 삽입  : "제 to the 하"  (글자 사이에 " to the " 삽입)
- *      - 대소문자 무시: "제 TO THE 하", "제 To The 하" 모두 인식
- *      - 공백 수 무관: "제  to  the  하" (공백 여러 개도 인식)
+ *   지원하는 변형 (키워드: "제하" 기준):
+ *   1. 정확히 일치              : "제하"
+ *   2. to the 삽입              : "제 to the 하"  (대소문자·공백 수 무관)
+ *   3. 공백 삽입                : "제 하"
+ *   4. 특수문자 삽입            : "제~하", "제-하", "제.하", "제!하"
+ *   5. 뒤에 한글 자모 추가      : "제하ㅋㅋ", "제하ㅎㅎ", "제하ㅠ"
+ *   6. 뒤에 특수문자/이모지 추가: "제하~~~", "제하!!!", "제하😂"
+ *   7. 위 조합                  : "제 to the 하ㅋㅋ", "제~하~"
  *
- *   구현 방식: 키워드의 각 글자 사이에 `(?:\s+to\s+the\s+)?` 패턴을 삽입한 정규식 생성.
- *   키워드가 "제하"이면 → `^제(?:\s+to\s+the\s+)?하$` 정규식으로 매칭.
- *   `i` 플래그로 대소문자 무시.
- *   정규식 특수문자(`.`, `*` 등)는 escape 처리해 안전하게 패턴에 포함한다.
+ *   구현 방식 — "핵심 문자 추출":
+ *   1. " to the " 패턴을 먼저 제거 (ASCII 문자라 단계 분리 필요)
+ *   2. 한글 음절(AC00-D7A3)과 영문자(a-zA-Z)만 남기고 나머지 전부 제거
+ *      → 공백, 특수문자, 이모지, 한글 자모(ㅋ·ㅎ·ㅠ 등)는 모두 소거
+ *   3. 추출된 핵심 문자열이 키워드와 일치하면 인정
+ *
+ *   올바르게 거부하는 예:
+ *   - "제이하" → 핵심 = "제이하" ≠ "제하" (다른 음절이 끼어 있음)
+ *   - "제하요" → 핵심 = "제하요" ≠ "제하" (한글 음절 "요"는 의미 있는 문자)
+ *   - "제하나" → 핵심 = "제하나" ≠ "제하"
  */
 
 import Store from 'electron-store'
@@ -131,11 +140,12 @@ export function matchesAttendanceKeyword(message: string, keyword: string): bool
   // 정확히 일치하면 바로 반환 (regex 생성 비용 절감)
   if (text === kw) return true
 
-  // 키워드 각 글자 사이에 "to the" 변형 패턴을 허용하는 정규식 생성
-  // 예) "제하" → /^제(?:\s+to\s+the\s+)?하$/i
-  const escaped = [...kw].map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-  const pattern = escaped.join('(?:\\s+to\\s+the\\s+)?')
-  return new RegExp(`^${pattern}$`, 'i').test(text)
+  // 핵심 문자 추출: "to the" 변형 제거 후 한글 음절(가-힣)·영문자만 남김
+  // 한글 자모(ㅋ, ㅎ, ㅠ 등), 공백, 이모지, 특수문자는 모두 제거되어 노이즈 제거
+  const extractCore = (s: string) =>
+    s.replace(/\s+to\s+the\s+/gi, '').replace(/[^a-zA-Z가-힣]/g, '')
+
+  return extractCore(text) === extractCore(kw)
 }
 
 export function buildReply(template: string, nickname: string, count: number): string {
