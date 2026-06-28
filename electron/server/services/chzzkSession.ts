@@ -300,6 +300,25 @@ export class ChzzkSession {
             : new Date().toISOString(),
         })
 
+        // ── 출석 체크 처리 ───────────────────────────────────────────────────────
+        const { getAttendanceSettings, processAttendance, buildReply } = require('./attendanceService')
+        const attSettings = getAttendanceSettings()
+        if (
+          attSettings.enabled &&
+          attSettings.keyword &&
+          msg === attSettings.keyword.trim()
+        ) {
+          const result = processAttendance(this.channelId, nickname, userId)
+          if (!result.alreadyChecked) {
+            this.io.emit('attendance', { nickname, count: result.count, isNew: result.isNew })
+            const reply = buildReply(attSettings.replyTemplate, nickname, result.count)
+            const { sendChat } = require('../services/chzzkApi')
+            sendChat(this.accessToken, reply, this.clientId).catch((e: unknown) => {
+              console.error('[Attendance] sendChat failed:', e)
+            })
+          }
+        }
+
         // ── 투표 커맨드 처리 ─────────────────────────────────────────────────────
         const { startPoll, stopPoll, vote, isActive, getVoteState } = require('./votingService')
 

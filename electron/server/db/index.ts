@@ -111,5 +111,18 @@ function migrate() {
     CREATE INDEX IF NOT EXISTS idx_follows_channel_created ON follows(channel_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_follower_list_staging_channel ON follower_list_staging(channel_id);
     CREATE INDEX IF NOT EXISTS idx_missions_channel_created ON missions(channel_id, created_at);
+
+    CREATE TABLE IF NOT EXISTS attendance (
+      id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+      channel_id         TEXT    NOT NULL,
+      nickname           TEXT    NOT NULL,
+      user_id            TEXT    NOT NULL DEFAULT '',
+      total_count        INTEGER NOT NULL DEFAULT 1,
+      last_attended_date TEXT    NOT NULL,
+      first_attended_at  TEXT    NOT NULL,
+      last_attended_at   TEXT    NOT NULL,
+      UNIQUE(channel_id, nickname)
+    );
+    CREATE INDEX IF NOT EXISTS idx_attendance_channel ON attendance(channel_id, last_attended_date);
   `)
 }
