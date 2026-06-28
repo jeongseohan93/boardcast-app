@@ -31,8 +31,9 @@ import {
   StreamPreviewCard,
 } from './overlayShared'
 import DonationRulesPage from './DonationRulesPage'
+import TtsDonationPage from './TtsDonationPage'
 
-type Tab = 'chat' | 'donation' | 'follow' | 'avachat' | 'rules'
+type Tab = 'chat' | 'donation' | 'follow' | 'avachat' | 'rules' | 'tts'
 
 const TABS: { key: Tab; label: string; path: string; themes: typeof CHAT_THEMES }[] = [
   { key: 'chat',     label: '채팅',        path: '/overlay/chat',     themes: CHAT_THEMES     },
@@ -40,6 +41,7 @@ const TABS: { key: Tab; label: string; path: string; themes: typeof CHAT_THEMES 
   { key: 'follow',   label: '팔로우 알림',  path: '/overlay/follow',   themes: FOLLOW_THEMES   },
   { key: 'avachat',  label: '아바타 채팅',  path: '/overlay/avachat',  themes: []              },
   { key: 'rules',    label: '금액별 규칙',  path: '',                  themes: []              },
+  { key: 'tts',      label: '후원 TTS',    path: '',                  themes: []              },
 ]
 
 const PRESET_COLORS = ['#00FFA3','#A78BFA','#60A5FA','#F472B6','#FFD166','#FB923C','#EF4444','#ffffff']
@@ -349,8 +351,15 @@ export default function OverlaySettingsPage() {
         </div>
       )}
 
-      {/* 테마·본문 영역 (rules 탭에서는 DonationRulesPage가 대신 렌더링) */}
-      {activeTab !== 'rules' && <div className="shrink-0 border-b border-border bg-bg-card">
+      {/* 후원 TTS 탭 — 별도 레이아웃으로 전환 */}
+      {activeTab === 'tts' && (
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <TtsDonationPage />
+        </div>
+      )}
+
+      {/* 테마·본문 영역 (rules/tts 탭에서는 해당 페이지가 대신 렌더링) */}
+      {activeTab !== 'rules' && activeTab !== 'tts' && <div className="shrink-0 border-b border-border bg-bg-card">
         <button
           onClick={() => setThemeOpen((v) => !v)}
           className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/[0.02] transition-colors"
@@ -409,8 +418,8 @@ export default function OverlaySettingsPage() {
         )}
       </div>}
 
-      {/* 본문 2단 (rules 탭에서는 숨김) */}
-      {activeTab !== 'rules' && <div className="flex-1 flex min-h-0 overflow-hidden">
+      {/* 본문 2단 (rules/tts 탭에서는 숨김) */}
+      {activeTab !== 'rules' && activeTab !== 'tts' && <div className="flex-1 flex min-h-0 overflow-hidden">
 
         {/* 좌: 표시 설정 */}
         <div className="flex-1 flex flex-col min-h-0 border-r border-border overflow-hidden min-w-0">
