@@ -282,11 +282,7 @@ function getSettings() {
     .catch(() => _settings || {})
 }
 
-/* ── 후원 TTS 시스템 ──────────────────────────────────────────────────────
- *   Web Speech API(SpeechSynthesis)를 사용해 OBS 브라우저 소스에서 직접 TTS를 재생.
- *   복수 후원이 연속으로 오면 큐에 쌓아 순서대로 읽는다.
- *   설정은 30초 캐시로 관리하며 overlay/settings와 독립적으로 저장된다.
- * ─────────────────────────────────────────────────────────────────────── */
+/* ── 후원 TTS: Web Speech API 큐 시스템 ── */
 let _ttsSettings    = null
 let _ttsSettingsAt  = 0
 const _ttsQueue     = []
@@ -295,9 +291,9 @@ let _ttsBusy        = false
 function getTtsSettings() {
   if (_ttsSettings && Date.now() - _ttsSettingsAt < SETTINGS_TTL) return Promise.resolve(_ttsSettings)
   return fetch('/api/tts-donation/settings')
-    .then(r => r.ok ? r.json() : null)
+    .then(r => r.ok ? r.json() : Promise.reject(new Error('non-ok')))
     .then(d => { _ttsSettings = d; _ttsSettingsAt = Date.now(); return d })
-    .catch(() => _ttsSettings)
+    .catch(() => _ttsSettings)   // 에러 시 기존 캐시 반환, 타임스탬프 갱신 안 함 → 즉시 재시도 가능
 }
 
 function runTtsQueue() {
@@ -342,7 +338,6 @@ async function tryTts(data) {
 }
 
 async function showAlert(data) {
-  // 사운드 재생 — 규칙에 soundDataUrl이 있으면 우선 재생
   if (typeof data.soundDataUrl === 'string' && data.soundDataUrl) {
     try {
       const audio = new Audio(data.soundDataUrl)
@@ -387,7 +382,7 @@ async function showAlert(data) {
     setTimeout(() => dismiss(el), showMs)
   }
 
-  tryTts(data)
+  tryTts(data)  // fire-and-forget: 큐에 넣고 반환
 }
 
 function dismiss(el) {

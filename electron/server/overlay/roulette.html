@@ -236,16 +236,9 @@
 </div>
 
 <script>
-/* ═══════════════════════════════════════════════════════════════════════
-   룰렛 사운드 시스템 (Web Audio API — 외부 파일 없음)
-
-   설계 원칙:
-   ① 스핀 이징 커브를 역산해 아이템 경계선 통과 순간마다 틱 예약
-      → 휠 이징(cubic ease-out, pow=3) / 슬롯 이징(quartic, pow=4) 각각 적용
-   ② 배경 화이트노이즈(bandpass 스윕)로 휠이 감속하는 느낌을 보강
-   ③ 당첨 시 E장조 아르페지오 + 스파클음 팡파르
-   ④ 노드는 _nodes[] 에 보관했다가 다음 스핀 시작/완료 시 일괄 정리
-   ═══════════════════════════════════════════════════════════════════════ */
+/* 룰렛 사운드 (Web Audio API, 외부 파일 없음)
+   이징 커브 역산으로 아이템 경계 통과 시각에 틱 예약, 스핀 완료 시 팡파르.
+   _nodes[] 에 보관 → 다음 스핀 startSpinSound/playWinFanfare 에서 일괄 정리. */
 let _actx = null
 const _nodes = []   // { s: AudioScheduledSourceNode, g: GainNode }
 
@@ -361,6 +354,7 @@ function playWinFanfare() {
       env.gain.exponentialRampToValueAtTime(0.001, t0 + t + 1.15)
       osc.start(t0 + t)
       osc.stop(t0 + t + 1.2)
+      _nodes.push({ s: osc, g: env })
     })
     // 스파클 하이라이트 (E6)
     const sp = ctx.createOscillator()
@@ -374,6 +368,7 @@ function playWinFanfare() {
     sg.gain.exponentialRampToValueAtTime(0.001, t0 + 0.98)
     sp.start(t0 + 0.55)
     sp.stop(t0 + 1.0)
+    _nodes.push({ s: sp, g: sg })
   } catch (e) { console.warn('[Roulette Sound] fanfare:', e) }
 }
 </script>
@@ -622,7 +617,7 @@ function reportRouletteResult(winner) {
 
 function finishSpin(winner) {
   reportRouletteResult(winner)
-  playWinFanfare()   // 당첨 팡파르 (스핀 사운드 정리 후 즉시 재생)
+  playWinFanfare()
   setTimeout(() => {
     winnerName.textContent = winner.label
     container.classList.add('winner-active')
@@ -787,8 +782,6 @@ function spinWheel(items, donation) {
   const startTime = performance.now()
   const duration = 5000
 
-  // 이징 역산으로 아이템 경계선 통과 시각과 동기화된 틱 사운드 예약
-  // 총 틱 수 = 총 회전수(전체 라디안 / 2π) × 아이템 수
   startSpinSound(Math.round(totalRot / (2 * Math.PI)) * items.length, duration / 1000, 3)
 
   function animate(now) {
@@ -1029,7 +1022,6 @@ function spinSlot(items, donation) {
   const duration = 5000
   const startTime = performance.now()
 
-  // 슬롯은 한 칸(slotStepY) 이동마다 틱 1회. 총 이동 칸 수 = targetRow - 현재 행
   startSpinSound(Math.max(1, targetRow - Math.round(s0 / slotStepY)), duration / 1000, 4)
 
   function animate(now) {

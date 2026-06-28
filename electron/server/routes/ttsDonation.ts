@@ -1,10 +1,3 @@
-/**
- * [후원 TTS 설정 API]
- *
- * TTS 설정을 조회·저장한다.
- * GET  /api/tts-donation/settings
- * POST /api/tts-donation/settings
- */
 import { Router } from 'express'
 import { getTtsDonationSettings, saveTtsDonationSettings, TtsDonationSettings } from '../services/ttsDonationService'
 
@@ -15,8 +8,12 @@ router.get('/settings', (_req, res) => {
 })
 
 router.post('/settings', (req, res) => {
-  const body = req.body as Partial<TtsDonationSettings>
-  saveTtsDonationSettings(body)
+  const body = req.body
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    res.status(400).json({ error: 'settings must be an object' })
+    return
+  }
+  saveTtsDonationSettings(body as Partial<TtsDonationSettings>)
   res.json({ ok: true })
 })
 
