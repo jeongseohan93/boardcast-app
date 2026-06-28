@@ -301,12 +301,12 @@ export class ChzzkSession {
         })
 
         // ── 출석 체크 처리 ───────────────────────────────────────────────────────
-        const { getAttendanceSettings, processAttendance, buildReply } = require('./attendanceService')
+        const { getAttendanceSettings, processAttendance, buildReply, matchesAttendanceKeyword } = require('./attendanceService')
         const attSettings = getAttendanceSettings()
         if (
           attSettings.enabled &&
           attSettings.keyword &&
-          msg === attSettings.keyword.trim()
+          matchesAttendanceKeyword(msg, attSettings.keyword)
         ) {
           const result = processAttendance(this.channelId, nickname, userId)
           if (!result.alreadyChecked) {

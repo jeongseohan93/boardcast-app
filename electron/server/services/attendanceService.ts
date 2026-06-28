@@ -19,6 +19,20 @@
  *   keyword       → 출석을 트리거하는 채팅 키워드 (예: "제하", "안녕")
  *   replyTemplate → 봇 응답 템플릿. {nickname}, {count} 플레이스홀더 지원
  *   enabled       → 기능 활성화 여부
+ *
+ * ── matchesAttendanceKeyword (유연한 키워드 매칭) ─────────────────────────
+ *   한국 인터넷 문화에서 키워드를 창의적으로 변형해 입력하는 패턴을 처리한다.
+ *
+ *   지원하는 변형:
+ *   1. 정확히 일치  : "제하"
+ *   2. to the 삽입  : "제 to the 하"  (글자 사이에 " to the " 삽입)
+ *      - 대소문자 무시: "제 TO THE 하", "제 To The 하" 모두 인식
+ *      - 공백 수 무관: "제  to  the  하" (공백 여러 개도 인식)
+ *
+ *   구현 방식: 키워드의 각 글자 사이에 `(?:\s+to\s+the\s+)?` 패턴을 삽입한 정규식 생성.
+ *   키워드가 "제하"이면 → `^제(?:\s+to\s+the\s+)?하$` 정규식으로 매칭.
+ *   `i` 플래그로 대소문자 무시.
+ *   정규식 특수문자(`.`, `*` 등)는 escape 처리해 안전하게 패턴에 포함한다.
  */
 
 import Store from 'electron-store'
@@ -102,6 +116,26 @@ export function processAttendance(
   `).run(newCount, today, now, userId || existing.user_id, channelId, nickname)
 
   return { alreadyChecked: false, count: newCount, isNew: false }
+}
+
+/**
+ * 메시지가 출석 키워드와 일치하는지 확인한다.
+ * 정확히 일치하거나 "제 to the 하" 형태의 변형도 인식한다.
+ */
+export function matchesAttendanceKeyword(message: string, keyword: string): boolean {
+  const kw = keyword.trim()
+  if (!kw) return false
+
+  const text = message.trim()
+
+  // 정확히 일치하면 바로 반환 (regex 생성 비용 절감)
+  if (text === kw) return true
+
+  // 키워드 각 글자 사이에 "to the" 변형 패턴을 허용하는 정규식 생성
+  // 예) "제하" → /^제(?:\s+to\s+the\s+)?하$/i
+  const escaped = [...kw].map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+  const pattern = escaped.join('(?:\\s+to\\s+the\\s+)?')
+  return new RegExp(`^${pattern}$`, 'i').test(text)
 }
 
 export function buildReply(template: string, nickname: string, count: number): string {
