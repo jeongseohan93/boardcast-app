@@ -283,6 +283,15 @@ function getSettings() {
 }
 
 async function showAlert(data) {
+  // 사운드 재생 — 규칙에 soundDataUrl이 있으면 우선 재생
+  if (typeof data.soundDataUrl === 'string' && data.soundDataUrl) {
+    try {
+      const audio = new Audio(data.soundDataUrl)
+      audio.volume = typeof data.soundVolume === 'number' ? Math.max(0, Math.min(1, data.soundVolume)) : 1
+      audio.play().catch(() => {})
+    } catch {}
+  }
+
   const cfg = await getSettings()
   const ds  = (cfg && cfg.donation) ? cfg.donation : {}
 

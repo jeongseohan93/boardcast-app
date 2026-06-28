@@ -414,8 +414,17 @@ export class ChzzkSession {
         }
 
         // 룰렛이 발동되지 않은 경우에만 채팅 후원 오버레이 표시
+        // 금액별 알림 규칙에서 매칭되는 이미지·사운드를 첨부
         if (!rouletteTriggered) {
-          this.io.emit('donation', event)
+          const { matchDonationAlertRule } = require('./donationAlertService')
+          const rule = matchDonationAlertRule(amount)
+          this.io.emit('donation', {
+            ...event,
+            imageDataUrl: rule?.imageDataUrl ?? '',
+            imageSize: rule?.imageSize ?? 118,
+            soundDataUrl: rule?.soundDataUrl ?? '',
+            soundVolume: rule?.soundVolume ?? 1,
+          })
         }
 
         // 영상 후원은 금액/룰렛과 무관하게 YouTube 링크 여부로 독립 처리
