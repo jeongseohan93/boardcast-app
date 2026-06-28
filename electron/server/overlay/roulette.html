@@ -235,6 +235,149 @@
   <div id="winner-name"></div>
 </div>
 
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   룰렛 사운드 시스템 (Web Audio API — 외부 파일 없음)
+
+   설계 원칙:
+   ① 스핀 이징 커브를 역산해 아이템 경계선 통과 순간마다 틱 예약
+      → 휠 이징(cubic ease-out, pow=3) / 슬롯 이징(quartic, pow=4) 각각 적용
+   ② 배경 화이트노이즈(bandpass 스윕)로 휠이 감속하는 느낌을 보강
+   ③ 당첨 시 E장조 아르페지오 + 스파클음 팡파르
+   ④ 노드는 _nodes[] 에 보관했다가 다음 스핀 시작/완료 시 일괄 정리
+   ═══════════════════════════════════════════════════════════════════════ */
+let _actx = null
+const _nodes = []   // { s: AudioScheduledSourceNode, g: GainNode }
+
+function getActx() {
+  if (!_actx) _actx = new (window.AudioContext || window.webkitAudioContext)()
+  if (_actx.state === 'suspended') _actx.resume()
+  return _actx
+}
+
+// 짧은 클릭/틱 (경계선 통과마다)
+function scheduleTick(ctx, t, freq, vol) {
+  const osc = ctx.createOscillator()
+  const env = ctx.createGain()
+  osc.connect(env)
+  env.connect(ctx.destination)
+  osc.type = 'triangle'
+  osc.frequency.setValueAtTime(freq * 1.7, t)
+  osc.frequency.exponentialRampToValueAtTime(freq * 0.5, t + 0.05)
+  env.gain.setValueAtTime(0, t)
+  env.gain.linearRampToValueAtTime(vol, t + 0.002)
+  env.gain.exponentialRampToValueAtTime(0.001, t + 0.065)
+  osc.start(t)
+  osc.stop(t + 0.07)
+  _nodes.push({ s: osc, g: env })
+}
+
+// 배경 화이트노이즈 — bandpass 주파수가 고속→저속으로 스윕되며 감속감 형성
+function scheduleWhirr(ctx, t0, durSec) {
+  const rate = ctx.sampleRate
+  const buf  = ctx.createBuffer(1, Math.ceil(rate * durSec), rate)
+  const d    = buf.getChannelData(0)
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1
+
+  const src  = ctx.createBufferSource()
+  const filt = ctx.createBiquadFilter()
+  const env  = ctx.createGain()
+  src.buffer = buf
+  src.connect(filt); filt.connect(env); env.connect(ctx.destination)
+  filt.type = 'bandpass'
+  filt.frequency.setValueAtTime(1100, t0)
+  filt.frequency.exponentialRampToValueAtTime(50, t0 + durSec * 0.88)
+  filt.Q.setValueAtTime(1.2, t0)
+  env.gain.setValueAtTime(0, t0)
+  env.gain.linearRampToValueAtTime(0.08, t0 + 0.2)
+  env.gain.setValueAtTime(0.08, t0 + durSec - 0.35)
+  env.gain.linearRampToValueAtTime(0, t0 + durSec)
+  src.start(t0)
+  src.stop(t0 + durSec + 0.05)
+  _nodes.push({ s: src, g: env })
+}
+
+function stopSpinSounds() {
+  _nodes.forEach(n => {
+    try { n.s.stop(0) } catch {}
+    try { n.g.disconnect() } catch {}
+  })
+  _nodes.length = 0
+}
+
+// 이징 역산: 거리 기준 k/totalTicks 지점에 도달하는 시간(초) 계산
+// eased = 1 - (1-t)^pow  →  t = 1 - (1 - frac)^(1/pow)
+function buildTickTimes(totalTicks, durSec, pow) {
+  const times = []
+  const cap = Math.min(totalTicks, 500)   // 과도한 노드 방지
+  for (let k = 1; k < cap; k++) {
+    const frac = k / totalTicks
+    const t    = 1 - Math.pow(Math.max(0, 1 - frac), 1 / pow)
+    times.push(t * durSec)
+  }
+  return times
+}
+
+// 스핀 사운드 시작
+// totalTicks: 총 경계선 통과 횟수, durSec: 스핀 시간(초), pow: 이징 지수
+function startSpinSound(totalTicks, durSec, pow) {
+  stopSpinSounds()
+  try {
+    const ctx = getActx()
+    const t0  = ctx.currentTime + 0.04   // 40ms 선행 버퍼
+
+    scheduleWhirr(ctx, t0, durSec)
+
+    buildTickTimes(totalTicks, durSec, pow).forEach((t) => {
+      const p    = t / durSec
+      const vol  = 0.52 - p * 0.38        // 0.52 → 0.14 (점점 조용)
+      const freq = 310  - p * 140         // 310Hz → 170Hz (점점 낮음)
+      scheduleTick(ctx, t0 + t, freq, vol)
+    })
+  } catch (e) { console.warn('[Roulette Sound] spin:', e) }
+}
+
+// 당첨 팡파르 — E장조 아르페지오(E4-G#4-B4-E5) + E6 스파클
+function playWinFanfare() {
+  stopSpinSounds()
+  try {
+    const ctx = getActx()
+    const t0  = ctx.currentTime + 0.08
+    const notes = [
+      { f: 329.6, t: 0.00 },
+      { f: 415.3, t: 0.13 },
+      { f: 493.9, t: 0.24 },
+      { f: 659.3, t: 0.34 },
+    ]
+    notes.forEach(({ f, t }) => {
+      const osc = ctx.createOscillator()
+      const env = ctx.createGain()
+      osc.connect(env); env.connect(ctx.destination)
+      osc.type = 'triangle'
+      osc.frequency.setValueAtTime(f, t0 + t)
+      env.gain.setValueAtTime(0, t0 + t)
+      env.gain.linearRampToValueAtTime(0.28, t0 + t + 0.012)
+      env.gain.setValueAtTime(0.22, t0 + t + 0.18)
+      env.gain.exponentialRampToValueAtTime(0.001, t0 + t + 1.15)
+      osc.start(t0 + t)
+      osc.stop(t0 + t + 1.2)
+    })
+    // 스파클 하이라이트 (E6)
+    const sp = ctx.createOscillator()
+    const sg = ctx.createGain()
+    sp.connect(sg); sg.connect(ctx.destination)
+    sp.type = 'sine'
+    sp.frequency.setValueAtTime(1318.5, t0 + 0.55)
+    sp.frequency.exponentialRampToValueAtTime(880, t0 + 0.95)
+    sg.gain.setValueAtTime(0, t0 + 0.55)
+    sg.gain.linearRampToValueAtTime(0.14, t0 + 0.57)
+    sg.gain.exponentialRampToValueAtTime(0.001, t0 + 0.98)
+    sp.start(t0 + 0.55)
+    sp.stop(t0 + 1.0)
+  } catch (e) { console.warn('[Roulette Sound] fanfare:', e) }
+}
+</script>
+
 <script src="/socket.io/socket.io.js"></script>
 <script>
 const COLORS = ['#00FFA3','#A78BFA','#F4A261','#72EFDD','#FF6B9D','#FFD166','#06D6A0','#C77DFF']
@@ -479,6 +622,7 @@ function reportRouletteResult(winner) {
 
 function finishSpin(winner) {
   reportRouletteResult(winner)
+  playWinFanfare()   // 당첨 팡파르 (스핀 사운드 정리 후 즉시 재생)
   setTimeout(() => {
     winnerName.textContent = winner.label
     container.classList.add('winner-active')
@@ -642,6 +786,10 @@ function spinWheel(items, donation) {
   const startAngle = currentAngle
   const startTime = performance.now()
   const duration = 5000
+
+  // 이징 역산으로 아이템 경계선 통과 시각과 동기화된 틱 사운드 예약
+  // 총 틱 수 = 총 회전수(전체 라디안 / 2π) × 아이템 수
+  startSpinSound(Math.round(totalRot / (2 * Math.PI)) * items.length, duration / 1000, 3)
 
   function animate(now) {
     const elapsed = now - startTime
@@ -880,6 +1028,9 @@ function spinSlot(items, donation) {
   const s0 = slotScrollY
   const duration = 5000
   const startTime = performance.now()
+
+  // 슬롯은 한 칸(slotStepY) 이동마다 틱 1회. 총 이동 칸 수 = targetRow - 현재 행
+  startSpinSound(Math.max(1, targetRow - Math.round(s0 / slotStepY)), duration / 1000, 4)
 
   function animate(now) {
     const elapsed = now - startTime
