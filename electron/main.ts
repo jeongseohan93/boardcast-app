@@ -35,6 +35,7 @@ function createWindow() {
     backgroundColor: '#17191D', // 로딩 전 깜빡임 방지용 기본 배경색
     frame: false,
     webPreferences: {
+      webviewTag: true,
       preload: path.join(__dirname, 'preload.js'), // contextBridge 설정 스크립트
       contextIsolation: true,  // 렌더러와 Node.js 컨텍스트 분리 (보안)
       nodeIntegration: false,  // 렌더러에서 require() 사용 금지 (보안)

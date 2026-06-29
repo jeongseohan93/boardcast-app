@@ -31,7 +31,7 @@
  *
  *   /                  → /dashboard 리다이렉트
  *   /dashboard         → DashboardPage       (대시보드 + 리모콘 웹뷰)
- *   /broadcast         → BroadcastManagePage (공지/미션/투표/영도)
+ *   /broadcast         → BroadcastManagePage (공지/투표/영도)
  *   /stream-settings   → StreamSettingsPage  (봇/후원/팔로워/이모티콘/룰렛/다마고치)
  *   /channel           → ChannelPage         (통계/활동제한)
  *   /overlay-hub       → OverlayHubPage      (오버레이 URL/설정)
@@ -64,6 +64,7 @@ import StreamSettingsPage from './pages/StreamSettingsPage'
 import ChannelPage from './pages/ChannelPage'
 import OverlayHubPage from './pages/OverlayHubPage'
 import PubgStatsPage from './pages/PubgStatsPage'
+import RoulettePage from './pages/RoulettePage'
 import SettingsPage from './pages/SettingsPage'
 import RawEventDebugPage from './pages/RawEventDebugPage'
 import { applyAppTheme, getStoredAppTheme } from './utils/appTheme'
@@ -125,6 +126,7 @@ function AppInner() {
         <Route path="/stream-settings" element={<StreamSettingsPage />} />
         <Route path="/channel"         element={<ChannelPage />} />
         <Route path="/overlay-hub"     element={<OverlayHubPage />} />
+        <Route path="/roulette"        element={<RoulettePage />} />
         <Route path="/pubg"            element={<PubgStatsPage />} />
         <Route path="/debug-events"    element={<RawEventDebugPage />} />
         <Route path="/settings"        element={<SettingsPage />} />
@@ -133,14 +135,12 @@ function AppInner() {
         {/* 방송 설정 → /stream-settings 탭 허브로 이동 */}
         <Route path="/bot"             element={<Navigate to="/stream-settings" replace />} />
         <Route path="/history"         element={<Navigate to="/stream-settings" replace />} />
-        <Route path="/roulette"        element={<Navigate to="/stream-settings" replace />} />
         <Route path="/followers"       element={<Navigate to="/stream-settings" replace />} />
         <Route path="/emote-party"     element={<Navigate to="/stream-settings" replace />} />
         <Route path="/tamagotchi"      element={<Navigate to="/stream-settings" replace />} />
 
         {/* 방송 관리 → /broadcast 탭 허브로 이동 */}
         <Route path="/notice"          element={<Navigate to="/broadcast" replace />} />
-        <Route path="/mission"         element={<Navigate to="/broadcast" replace />} />
         <Route path="/vote"            element={<Navigate to="/broadcast" replace />} />
         <Route path="/video-donation"  element={<Navigate to="/broadcast" replace />} />
 

@@ -33,12 +33,13 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { RefreshCw, WifiOff, LayoutGrid } from 'lucide-react'
+import { Monitor, Radio, RefreshCw, WifiOff, LayoutGrid } from 'lucide-react'
 import { eventsApi } from '../api/client'
 import { useAuthStore } from '../store/authStore'
 import { useSocket } from '../hooks/useSocket'
 import StatCards from '../components/dashboard/StatCards'
 import LiveSettingCard from '../components/dashboard/LiveSettingCard'
+import ChzzkRemotePanel from '../components/dashboard/ChzzkRemotePanel'
 import RecentEventsFeed from '../components/dashboard/RecentEventsFeed'
 import ChatPanel from '../components/dashboard/ChatPanel'
 import type { Summary, RecentEvent } from '../components/dashboard/types'
@@ -67,6 +68,9 @@ export default function DashboardPage() {
   )
   const [eventSide, setEventSide] = useState<'left' | 'right'>(() =>
     (localStorage.getItem('dashEventSide') as 'left' | 'right') || 'right'
+  )
+  const [mainPanel, setMainPanel] = useState<'settings' | 'remote'>(() =>
+    (localStorage.getItem('dashMainPanel') as 'settings' | 'remote') || 'settings'
   )
 
   const socketInit = useRef(false)
@@ -169,6 +173,10 @@ export default function DashboardPage() {
     setEventSide(next)
     localStorage.setItem('dashEventSide', next)
   }
+  const selectMainPanel = (next: 'settings' | 'remote') => {
+    setMainPanel(next)
+    localStorage.setItem('dashMainPanel', next)
+  }
 
   /* ── 통계 수치 계산 ─────────────────────────────────────────────────── */
   const todayDonation     = (summary?.today.donationSum ?? 0) + rtDonation
@@ -212,6 +220,33 @@ export default function DashboardPage() {
             </span>
           ) : null}
 
+          <div className="flex items-center overflow-hidden rounded-lg border border-border bg-bg-outer">
+            <button
+              type="button"
+              onClick={() => selectMainPanel('settings')}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs transition-colors ${
+                mainPanel === 'settings'
+                  ? 'bg-accent-mint text-bg-outer'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+              }`}
+            >
+              <Radio size={12} />
+              방송 설정
+            </button>
+            <button
+              type="button"
+              onClick={() => selectMainPanel('remote')}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs transition-colors ${
+                mainPanel === 'remote'
+                  ? 'bg-accent-mint text-bg-outer'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-white/5'
+              }`}
+            >
+              <Monitor size={12} />
+              리모콘
+            </button>
+          </div>
+
           <button
             onClick={() => setLayoutEditing((v) => !v)}
             className={`flex items-center gap-1.5 text-xs border rounded-lg px-2.5 py-1.5 transition-colors ${
@@ -235,7 +270,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── 바디 ──────────────────────────────────────────────────────── */}
-      <div className={`flex flex-1 min-h-0 overflow-hidden gap-3 p-3 ${chatSide === 'left' ? 'flex-row-reverse' : ''}`}>
+      <div className={`flex flex-1 min-h-0 overflow-hidden gap-3 p-3 ${mainPanel === 'settings' && chatSide === 'left' ? 'flex-row-reverse' : ''}`}>
 
         {/* 왼쪽 영역: 통계 + (방송설정 | 최근이벤트) */}
         <div className="flex-1 flex flex-col gap-3">
@@ -247,25 +282,32 @@ export default function DashboardPage() {
             todayFollow={todayFollow}
           />
 
-          <div className={`flex-1 flex min-h-0 gap-3 ${eventSide === 'left' ? 'flex-row-reverse' : ''}`}>
-            {/* 방송 설정 카드 — 자체적으로 live 데이터를 로드하므로 props 없음 */}
-            <LiveSettingCard />
+          <div className={`flex-1 flex min-h-0 gap-3 ${mainPanel === 'settings' && eventSide === 'left' ? 'flex-row-reverse' : ''}`}>
+            {mainPanel === 'settings' ? (
+              <>
+                <LiveSettingCard />
 
-            <RecentEventsFeed
-              summary={summary}
-              layoutEditing={layoutEditing}
-              eventSide={eventSide}
-              onToggleEventSide={toggleEventSide}
-            />
+                <RecentEventsFeed
+                  summary={summary}
+                  layoutEditing={layoutEditing}
+                  eventSide={eventSide}
+                  onToggleEventSide={toggleEventSide}
+                />
+              </>
+            ) : (
+              <ChzzkRemotePanel />
+            )}
           </div>
         </div>
 
         {/* 채팅 패널 */}
-        <ChatPanel
-          layoutEditing={layoutEditing}
-          chatSide={chatSide}
-          onToggleChatSide={toggleChatSide}
-        />
+        {mainPanel === 'settings' && (
+          <ChatPanel
+            layoutEditing={layoutEditing}
+            chatSide={chatSide}
+            onToggleChatSide={toggleChatSide}
+          />
+        )}
 
       </div>
     </div>

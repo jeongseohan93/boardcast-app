@@ -43,6 +43,7 @@ import {
   Radio,            // 방송 관리 아이콘
   SlidersHorizontal,// 방송 설정 아이콘
   Monitor,          // 오버레이 아이콘
+  Dices,            // 딜 룰렛 아이콘
   Gamepad2,         // 배그 전적 아이콘
   BarChart2,        // 채널 분석 아이콘
   Settings,         // 환경설정 아이콘
@@ -57,7 +58,7 @@ import {
  * items 간 구분선은 첫 번째 이후 그룹 사이에만 자동으로 그려진다(gi > 0).
  *
  * 탭 허브 페이지 매핑:
- *   /broadcast       → BroadcastManagePage (공지/미션/투표/영도)
+ *   /broadcast       → BroadcastManagePage (공지/투표/영도)
  *   /stream-settings → StreamSettingsPage  (봇/후원/팔로워/이모티콘/룰렛/다마고치)
  *   /channel         → ChannelPage         (통계/활동제한)
  *   /overlay-hub     → OverlayHubPage      (URL목록/오버레이설정)
@@ -71,6 +72,7 @@ const NAV_GROUPS = [
       { to: '/stream-settings', icon: SlidersHorizontal, label: '방송 설정' },
       { to: '/channel',         icon: BarChart2,         label: '채널 분석' },
       { to: '/overlay-hub',     icon: Monitor,           label: '오버레이' },
+      { to: '/roulette',        icon: Dices,             label: '딜 룰렛' },
       { to: '/pubg',            icon: Gamepad2,          label: '배그 전적' },
     ],
   },

@@ -9,6 +9,11 @@ const store = new Store()
 
 const PUBG_API = 'https://api.pubg.com/shards'
 const PLATFORMS = new Set(['steam', 'kakao', 'psn', 'xbox'])
+const MAX_PROCESSED_MATCH_IDS = 100
+const BASELINE_MATCH_LIMIT = 50
+const PROGRAM_STARTED_AT = new Date()
+const PROGRAM_STARTED_AT_MS = PROGRAM_STARTED_AT.getTime()
+const PROGRAM_STARTED_AT_ISO = PROGRAM_STARTED_AT.toISOString()
 
 function secureGet(key: string): string | null {
   try {
@@ -118,12 +123,14 @@ interface PubgTrackingConfig {
   enabled: boolean
   includeTeamDamage: boolean   // 팀원 딜 합산 여부
   processedMatchIds: string[]
+  programStartedAt: string
   lastPolledAt?: string
   lastError?: string
   lastApplied?: { matchId: string; damage: number; teamDamage?: number; appliedAt: string; gameMode?: string }
 }
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
+let pollInFlight: Promise<void> | null = null
 
 function getTracking(): PubgTrackingConfig {
   const saved = (store.get('pubgTracking') as Partial<PubgTrackingConfig>) || {}
@@ -134,6 +141,7 @@ function getTracking(): PubgTrackingConfig {
     enabled: saved.enabled ?? false,
     includeTeamDamage: saved.includeTeamDamage ?? false,
     processedMatchIds: saved.processedMatchIds ?? [],
+    programStartedAt: PROGRAM_STARTED_AT_ISO,
     accountId: saved.accountId,
     lastPolledAt: saved.lastPolledAt,
     lastError: saved.lastError,
@@ -145,19 +153,74 @@ function saveTracking(config: PubgTrackingConfig) {
   store.set('pubgTracking', config)
 }
 
-async function doPoll() {
+function rememberMatchIds(existing: string[], ids: string[]) {
+  return Array.from(new Set([...existing, ...ids].filter(Boolean))).slice(-MAX_PROCESSED_MATCH_IDS)
+}
+
+function endedAfterProgramStart(match: ReturnType<typeof summarizeMatch>) {
+  const startedAt = Date.parse(match.createdAt || '')
+  if (!Number.isFinite(startedAt)) return false
+
+  const durationMs = Number.isFinite(match.duration) ? Math.max(0, match.duration ?? 0) * 1000 : 0
+  return startedAt + durationMs >= PROGRAM_STARTED_AT_MS
+}
+
+function createPubgClient(apiKey: string, platform: string, timeout = 15000) {
+  return axios.create({
+    baseURL: `${PUBG_API}/${normalizePlatform(platform)}`,
+    timeout,
+    headers: getHeaders(apiKey),
+  })
+}
+
+async function getMatchesEndedBeforeProgramStart(
+  client: ReturnType<typeof createPubgClient>,
+  accountId: string,
+  matchIds: string[]
+) {
+  const rows = await Promise.all(matchIds.map(async (matchId) => {
+    try {
+      const matchRes = await client.get(`/matches/${matchId}`)
+      const match = summarizeMatch(matchRes.data, accountId)
+      return endedAfterProgramStart(match) ? null : matchId
+    } catch {
+      return matchId
+    }
+  }))
+
+  return rows.filter((id): id is string => Boolean(id))
+}
+
+async function baselineCurrentMatches(config: PubgTrackingConfig, apiKey: string) {
+  const client = createPubgClient(apiKey, config.platform, 12000)
+  const playerRes = await client.get('/players', { params: { 'filter[playerNames]': config.name } })
+  const player = Array.isArray(playerRes.data?.data) ? playerRes.data.data[0] : null
+  if (!player) return config
+
+  const currentIds: string[] = (player.relationships?.matches?.data ?? []).map((m: any) => m.id)
+  const beforeProgramStartIds = await getMatchesEndedBeforeProgramStart(
+    client,
+    player.id,
+    currentIds.slice(0, BASELINE_MATCH_LIMIT)
+  )
+
+  return {
+    ...config,
+    accountId: player.id,
+    processedMatchIds: rememberMatchIds(config.processedMatchIds, beforeProgramStartIds),
+    lastPolledAt: new Date().toISOString(),
+    lastError: undefined,
+  }
+}
+
+async function doPollInner() {
   const config = getTracking()
   if (!config.enabled || !config.name || !config.listItemId) return
 
   const apiKey = secureGet('pubgApiKey')
   if (!apiKey) return
 
-  const platform = normalizePlatform(config.platform)
-  const client = axios.create({
-    baseURL: `${PUBG_API}/${platform}`,
-    timeout: 15000,
-    headers: getHeaders(apiKey),
-  })
+  const client = createPubgClient(apiKey, config.platform)
 
   try {
     const playerRes = await client.get('/players', { params: { 'filter[playerNames]': config.name } })
@@ -170,50 +233,54 @@ async function doPoll() {
     const accountId = player.id
     const recentMatchIds: string[] = (player.relationships?.matches?.data ?? []).map((m: any) => m.id)
     const processed = new Set(config.processedMatchIds || [])
-    const newIds = recentMatchIds.filter(id => !processed.has(id)).slice(0, 5)
+    const unprocessedIds = recentMatchIds.filter(id => !processed.has(id))
+    const matchIdToApply = unprocessedIds[0]
 
     let updatedConfig: PubgTrackingConfig = { ...config, accountId, lastPolledAt: new Date().toISOString(), lastError: undefined }
 
-    if (newIds.length > 0) {
-      const { applyDelta } = require('./rouletteList')
-      let updatedProcessedIds = [...(config.processedMatchIds || [])]
+    if (unprocessedIds.length > 0) {
+      // 최신 1판만 차감하고, 나머지 감지된 경기들은 처리 완료로 묶어 소급 차감을 막는다.
+      updatedConfig.processedMatchIds = rememberMatchIds(
+        config.processedMatchIds || [],
+        unprocessedIds.slice(0, BASELINE_MATCH_LIMIT)
+      )
+      saveTracking(updatedConfig)
 
-      for (const matchId of newIds) {
-        try {
-          const matchRes = await client.get(`/matches/${matchId}`)
-          const match = summarizeMatch(matchRes.data, accountId)
-          const myDamage = Math.round(match.damageDealt ?? 0)
+      if (matchIdToApply && config.lastApplied?.matchId !== matchIdToApply) {
+        const { applyDelta } = require('./rouletteList')
+        const matchRes = await client.get(`/matches/${matchIdToApply}`)
+        const match = summarizeMatch(matchRes.data, accountId)
+        if (!endedAfterProgramStart(match)) {
+          saveTracking(updatedConfig)
+          return
+        }
 
-          // 팀원 딜 합산 (본인 제외)
-          const teamDamage = config.includeTeamDamage
-            ? (match.teammates ?? [])
-                .filter((t: any) => !t.isSearchedPlayer)
-                .reduce((sum: number, t: any) => sum + Math.round(t.damageDealt ?? 0), 0)
-            : 0
+        const myDamage = Math.round(match.damageDealt ?? 0)
 
-          const totalDamage = myDamage + teamDamage
+        // 팀원 딜 합산 (본인 제외)
+        const teamDamage = config.includeTeamDamage
+          ? (match.teammates ?? [])
+              .filter((t: any) => !t.isSearchedPlayer)
+              .reduce((sum: number, t: any) => sum + Math.round(t.damageDealt ?? 0), 0)
+          : 0
 
-          if (totalDamage > 0) {
-            const label = config.includeTeamDamage ? 'PUBG 팀딜' : 'PUBG 딜'
-            const result = applyDelta(config.listItemId, -totalDamage, label)
-            if (result) {
-              try { io?.emit('rouletteList:update', result) } catch {}
-              updatedConfig.lastApplied = {
-                matchId,
-                damage: myDamage,
-                ...(config.includeTeamDamage ? { teamDamage } : {}),
-                appliedAt: new Date().toISOString(),
-                gameMode: match.gameMode,
-              }
+        const totalDamage = myDamage + teamDamage
+
+        if (totalDamage > 0) {
+          const label = config.includeTeamDamage ? 'PUBG 팀딜' : 'PUBG 딜'
+          const result = applyDelta(config.listItemId, -totalDamage, label)
+          if (result) {
+            try { io?.emit('rouletteList:update', result) } catch {}
+            updatedConfig.lastApplied = {
+              matchId: matchIdToApply,
+              damage: myDamage,
+              ...(config.includeTeamDamage ? { teamDamage } : {}),
+              appliedAt: new Date().toISOString(),
+              gameMode: match.gameMode,
             }
           }
-        } catch {}
-
-        updatedProcessedIds.push(matchId)
-        if (updatedProcessedIds.length > 100) updatedProcessedIds = updatedProcessedIds.slice(-100)
+        }
       }
-
-      updatedConfig.processedMatchIds = updatedProcessedIds
     }
 
     saveTracking(updatedConfig)
@@ -223,9 +290,30 @@ async function doPoll() {
   }
 }
 
+async function doPoll() {
+  if (pollInFlight) return pollInFlight
+  pollInFlight = doPollInner().finally(() => {
+    pollInFlight = null
+  })
+  return pollInFlight
+}
+
+async function baselineSavedTracking() {
+  const config = getTracking()
+  if (!config.enabled || !config.name) return
+
+  const apiKey = secureGet('pubgApiKey')
+  if (!apiKey) return
+
+  try {
+    saveTracking(await baselineCurrentMatches(config, apiKey))
+  } catch {}
+}
+
 export function initPubgTracking() {
   const config = getTracking()
   if (config.enabled) {
+    baselineSavedTracking().then(() => doPoll()).catch(() => {})
     pollTimer = setInterval(doPoll, 5 * 60 * 1000)
   }
 }
@@ -238,39 +326,39 @@ router.post('/tracking', async (req, res) => {
   const { name, platform, listItemId, enabled, includeTeamDamage } = req.body
   const config = getTracking()
   const wasEnabled = config.enabled
+  const nextName = typeof name === 'string' ? name.trim() : config.name
+  const nextPlatform = platform !== undefined ? normalizePlatform(platform) : normalizePlatform(config.platform)
+  const nextListItemId = typeof listItemId === 'string' ? listItemId : config.listItemId
 
   const next: PubgTrackingConfig = {
     ...config,
-    ...(typeof name === 'string' ? { name: name.trim() } : {}),
-    ...(platform !== undefined ? { platform: normalizePlatform(platform) } : {}),
-    ...(typeof listItemId === 'string' ? { listItemId } : {}),
+    name: nextName,
+    platform: nextPlatform,
+    listItemId: nextListItemId,
     ...(enabled !== undefined ? { enabled: Boolean(enabled) } : {}),
     ...(includeTeamDamage !== undefined ? { includeTeamDamage: Boolean(includeTeamDamage) } : {}),
   }
 
-  // 활성화 시: 현재 경기들을 처리 완료로 표시 (소급 차감 방지)
-  if (!wasEnabled && next.enabled && next.name) {
+  const trackingTargetChanged =
+    next.name !== config.name
+    || next.platform !== normalizePlatform(config.platform)
+    || next.listItemId !== config.listItemId
+  const shouldBaseline = next.enabled && next.name && (!wasEnabled || trackingTargetChanged)
+  let savedConfig = next
+
+  // 활성화/대상 변경 시: 현재 보이는 경기들을 처리 완료로 표시해 소급 차감을 막는다.
+  if (shouldBaseline) {
     try {
       const apiKey = secureGet('pubgApiKey')
       if (apiKey) {
-        const plt = normalizePlatform(next.platform)
-        const client = axios.create({ baseURL: `${PUBG_API}/${plt}`, timeout: 12000, headers: getHeaders(apiKey) })
-        const playerRes = await client.get('/players', { params: { 'filter[playerNames]': next.name } })
-        const player = Array.isArray(playerRes.data?.data) ? playerRes.data.data[0] : null
-        if (player) {
-          const currentIds: string[] = (player.relationships?.matches?.data ?? []).map((m: any) => m.id)
-          const existing = new Set(next.processedMatchIds)
-          currentIds.slice(0, 50).forEach(id => existing.add(id))
-          next.processedMatchIds = [...existing].slice(-100)
-          next.accountId = player.id
-        }
+        savedConfig = await baselineCurrentMatches(next, apiKey)
       }
     } catch {}
   }
 
-  saveTracking(next)
+  saveTracking(savedConfig)
 
-  if (next.enabled) {
+  if (savedConfig.enabled) {
     if (pollTimer) clearInterval(pollTimer)
     doPoll()
     pollTimer = setInterval(doPoll, 5 * 60 * 1000)
@@ -278,7 +366,7 @@ router.post('/tracking', async (req, res) => {
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
   }
 
-  res.json(next)
+  res.json(savedConfig)
 })
 
 // 수동 폴링 트리거

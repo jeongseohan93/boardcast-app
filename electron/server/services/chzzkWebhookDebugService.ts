@@ -20,7 +20,6 @@ export interface ChzzkWebhookDebugEntry {
   bodyText: string
   body: unknown
   bodyKeys: string[]
-  missionHints: string[]
   headers: Record<string, string>
 }
 
@@ -60,12 +59,6 @@ function bodyKeys(body: unknown): string[] {
     : []
 }
 
-function findMissionHints(value: unknown): string[] {
-  const text = JSON.stringify(value ?? '').toLowerCase()
-  const hints = ['mission', '미션', 'goal', '목표', 'quest', 'challenge']
-  return hints.filter((hint) => text.includes(hint.toLowerCase()))
-}
-
 export function getChzzkWebhookEvents(): ChzzkWebhookDebugEntry[] {
   const events = store.get(WEBHOOK_EVENTS_KEY) as ChzzkWebhookDebugEntry[] | undefined
   return Array.isArray(events) ? events : []
@@ -98,10 +91,6 @@ export function recordChzzkWebhookEvent(input: {
     bodyText,
     body,
     bodyKeys: bodyKeys(body),
-    missionHints: Array.from(new Set([
-      ...findMissionHints(headers),
-      ...findMissionHints(body),
-    ])),
     headers,
   }
 

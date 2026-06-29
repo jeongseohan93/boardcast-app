@@ -23,7 +23,7 @@
  *   - roulettes, listItems 같은 공유 데이터는 props로 받아 콜백으로만 변경을 알린다
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Dices, Gamepad2, Link, List, Pencil, Plus, RefreshCw, RotateCcw,
   ToggleLeft, ToggleRight, Trash2,
@@ -38,9 +38,10 @@ interface PubgTracking {
   listItemId: string
   enabled: boolean
   includeTeamDamage: boolean
+  programStartedAt?: string
   lastPolledAt?: string
   lastError?: string
-  lastApplied?: { damage: number; teamDamage?: number; appliedAt: string; gameMode?: string }
+  lastApplied?: { matchId?: string; damage: number; teamDamage?: number; appliedAt: string; gameMode?: string }
 }
 
 interface RouletteListPanelProps {
@@ -83,6 +84,14 @@ export default function RouletteListPanel({
   /* PUBG 딜 연동 상태 (서버에서 받은 initialPubgTracking으로 초기화) */
   const [pubgTracking, setPubgTracking] = useState<PubgTracking | null>(initialPubgTracking)
   const [pubgPolling,  setPubgPolling]  = useState(false)
+  const pubgStartedAtLabel = pubgTracking?.programStartedAt
+    ? new Date(pubgTracking.programStartedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+    : null
+
+  useEffect(() => {
+    if (!initialPubgTracking) return
+    setPubgTracking((prev) => prev ?? initialPubgTracking)
+  }, [initialPubgTracking])
 
   /* ── 룰렛 이름 인라인 편집 ───────────────────────────────────────────── */
   const startRename  = (r: RouletteConfig) => { setRenamingId(r.id); setRenameValue(r.name) }
@@ -181,11 +190,17 @@ export default function RouletteListPanel({
   const handlePubgPollNow = async () => {
     setPubgPolling(true)
     try {
+      const previousMatchId = pubgTracking?.lastApplied?.matchId
       const res = await pubgApi.pollNow()
       setPubgTracking(res.data)
       const applied = res.data?.lastApplied
-      if (applied) addToast({ type: 'info', title: '딜 차감', message: `-${applied.damage.toLocaleString()}` })
-      else          addToast({ type: 'info', title: '새 경기 없음' })
+      const isNewApplied = applied?.matchId && applied.matchId !== previousMatchId
+      if (isNewApplied) {
+        const totalDamage = (applied.damage ?? 0) + (applied.teamDamage ?? 0)
+        addToast({ type: 'info', title: '딜 차감', message: `-${totalDamage.toLocaleString()}` })
+      } else {
+        addToast({ type: 'info', title: '새 경기 없음' })
+      }
     } catch {
       addToast({ type: 'error', title: '폴링 실패' })
     } finally {
@@ -483,7 +498,10 @@ export default function RouletteListPanel({
                 마지막 확인: {new Date(pubgTracking.lastPolledAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
               </p>
             ) : (
-              <p className="text-[10px] text-text-muted">경기 종료 시 딜량이 자동으로 차감됩니다 (5분 주기)</p>
+              <p className="text-[10px] text-text-muted">
+                {pubgStartedAtLabel ? `${pubgStartedAtLabel} 이후 종료 경기만 차감됩니다` : '앱 실행 이후 종료 경기만 차감됩니다'}
+                {' '}(5분 주기)
+              </p>
             )}
           </div>
         </div>

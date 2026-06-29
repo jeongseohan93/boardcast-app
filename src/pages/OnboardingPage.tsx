@@ -19,11 +19,46 @@
  *   Client Secret 은 비밀값이므로 <input type="password"> 로 렌더링해 화면에 노출되지 않도록 한다.
  *   절대로 입력값을 로그에 출력하지 말 것.
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ExternalLink, CheckCircle } from 'lucide-react'
+import axios from 'axios'
 import { authApi } from '../api/client'
 import { useAuthStore } from '../store/authStore'
+
+const CHZZK_OAUTH_URL = 'https://chzzk.naver.com/account-interlock'
+const OAUTH_REDIRECT_URI = 'http://localhost:3001/auth/callback'
+
+type AuthErrorPayload = {
+  error?: {
+    status?: number
+    data?: {
+      code?: number
+      message?: string
+    }
+    message?: string
+  }
+  message?: string
+}
+
+function getAuthErrorMessage(error: unknown) {
+  if (!axios.isAxiosError(error)) {
+    return '로그인 처리 중 오류가 발생했습니다.'
+  }
+
+  const payload = error.response?.data as AuthErrorPayload | undefined
+  const upstreamMessage = payload?.error?.data?.message ?? payload?.error?.message ?? payload?.message
+
+  if (upstreamMessage === 'INVALID_CLIENT') {
+    return 'Client ID 또는 Client Secret이 올바르지 않습니다. 치지직 개발자센터의 앱 정보와 Redirect URI(http://localhost:3001/auth/callback)를 확인해 주세요.'
+  }
+
+  if (error.response?.status === 401) {
+    return '인증 정보가 거부되었습니다. Client ID/Secret과 Redirect URI를 확인해 주세요.'
+  }
+
+  return '로그인 처리 중 오류가 발생했습니다.'
+}
 
 const STEPS = [
   { num: 1, text: '치지직 개발자센터에서 앱을 등록합니다.' },
@@ -40,6 +75,12 @@ export default function OnboardingPage() {
   const [saving, setSaving]             = useState(false)
   const [logging, setLogging]           = useState(false)
   const [error, setError]               = useState('')
+
+  useEffect(() => {
+    authApi.getCredentials()
+      .then((creds) => setClientId(creds.data.clientId || ''))
+      .catch(() => undefined)
+  }, [])
 
   const handleSaveCredentials = async () => {
     if (!clientId.trim() || !clientSecret.trim()) {
@@ -59,21 +100,54 @@ export default function OnboardingPage() {
     setLogging(true)
     setError('')
     try {
+      const savedCreds = await authApi.getCredentials()
+      const savedClientId = savedCreds.data.clientId || ''
+      const inputClientId = clientId.trim()
+      const inputClientSecret = clientSecret.trim()
+      const shouldUpdateCredentials = !!inputClientSecret || (!!inputClientId && inputClientId !== savedClientId)
+
+      if (shouldUpdateCredentials) {
+        if (!inputClientId || !inputClientSecret) {
+          setError('Client ID와 Client Secret을 모두 입력해 주세요.')
+          setLogging(false)
+          return
+        }
+
+        await authApi.saveCredentials(inputClientId, inputClientSecret)
+        await checkAuth()
+      }
+
       const state = Math.random().toString(36).slice(2)
-      const redirectUri = 'http://localhost:3001/auth/callback'
-      const creds = await authApi.getCredentials()
+      const creds = shouldUpdateCredentials ? await authApi.getCredentials() : savedCreds
       const cid = creds.data.clientId
 
-      const oauthUrl = `https://chzzk.naver.com/account-interlock?clientId=${cid}&redirectUri=${encodeURIComponent(redirectUri)}&state=${state}`
+      const oauthParams = new URLSearchParams({
+        clientId: cid,
+        redirectUri: OAUTH_REDIRECT_URI,
+        state,
+      })
+      const oauthUrl = `${CHZZK_OAUTH_URL}?${oauthParams.toString()}`
 
       window.electronAPI.onOAuthCode(async (code, receivedState) => {
         window.electronAPI.removeOAuthListener()
         try {
+          if (!code) {
+            setError('치지직 로그인 응답에 인증 코드가 없습니다. 다시 시도해 주세요.')
+            setLogging(false)
+            return
+          }
+
+          if (receivedState !== state) {
+            setError('로그인 응답 검증에 실패했습니다. 다시 시도해 주세요.')
+            setLogging(false)
+            return
+          }
+
           await authApi.token(code, receivedState)
           await checkAuth()
           navigate('/dashboard')
-        } catch {
-          setError('로그인 처리 중 오류가 발생했습니다.')
+        } catch (err) {
+          setError(getAuthErrorMessage(err))
           setLogging(false)
         }
       })

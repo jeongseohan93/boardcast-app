@@ -20,7 +20,6 @@
  *   follow       → authStore.setFollowerCount + toastStore
  *   unfollow     → authStore.setFollowerCount + toastStore
  *   pollUpdate   → voteStore.setPoll
- *   mission      → missionStore.addOrUpdate + toastStore (PENDING/APPROVED 상태만 토스트)
  *
  * ── 정리 (cleanup) ────────────────────────────────────────────────────────
  *   mountCount 가 0이 될 때만 소켓을 실제로 끊는다.
@@ -32,8 +31,6 @@ import { useChatStore } from '../store/chatStore'
 import { useToastStore } from '../store/toastStore'
 import { useAuthStore } from '../store/authStore'
 import { useVoteStore } from '../store/voteStore'
-import { useMissionStore } from '../store/missionStore'
-import { getMissionStatusKind, getMissionStatusLabel, normalizeMissionStatus } from '../utils/missionStatus'
 
 let socketInstance: Socket | null = null
 let isInitialized = false
@@ -116,39 +113,6 @@ export function useSocket() {
 
     socketInstance.on('pollUpdate', (data: any) => {
       useVoteStore.getState().setPoll(data)
-    })
-
-    socketInstance.on('mission', (data: any) => {
-      const status = normalizeMissionStatus(data.status)
-      const success = status === 'SUCCESS'
-      const kind = getMissionStatusKind(status, success)
-
-      useMissionStore.getState().addOrUpdate({
-        missionDonationId: data.missionDonationId ?? '',
-        missionText: data.missionText ?? '',
-        status,
-        success,
-        durationTime: data.durationTime,
-        missionCreatedTime: data.missionCreatedTime,
-        missionEndTime: data.missionEndTime,
-        payAmount: Number(data.payAmount ?? 0),
-        donatorNickname: data.donatorNickname ?? 'unknown',
-        donatorChannelId: data.donatorChannelId ?? '',
-      })
-
-      if (status === 'PENDING' || status === 'APPROVED') {
-        useToastStore.getState().addToast({
-          type: 'info',
-          title: `미션 ${getMissionStatusLabel(status, success)}: ${data.missionText}`,
-          message: `${data.donatorNickname} · ${Number(data.payAmount ?? 0).toLocaleString()} 치즈`,
-        })
-      } else if (kind === 'success' || kind === 'failed') {
-        useToastStore.getState().addToast({
-          type: 'info',
-          title: `미션 ${getMissionStatusLabel(status, success)}: ${data.missionText}`,
-          message: data.donatorNickname,
-        })
-      }
     })
 
     return () => {

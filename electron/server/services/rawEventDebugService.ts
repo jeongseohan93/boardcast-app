@@ -16,7 +16,6 @@ export interface RawDonationDebugEntry {
   payAmount?: string
   donationText?: string
   donatorNickname?: string
-  missionHints: string[]
   raw: unknown
   parsed: Record<string, unknown>
 }
@@ -34,12 +33,10 @@ export interface RawSessionDebugEntry {
   donationType?: string
   status?: string
   kind?: string
-  missionKey?: string
   title?: string
   payAmount?: string
   donationText?: string
   donatorNickname?: string
-  missionHints: string[]
   rawArgs: unknown[]
   firstArg: unknown
   parsed: Record<string, unknown>
@@ -70,30 +67,6 @@ function safeForStore(value: unknown): unknown {
   } catch {
     return String(value)
   }
-}
-
-function findMissionHints(value: unknown): string[] {
-  let text = ''
-  try {
-    text = JSON.stringify(value ?? '').toLowerCase()
-  } catch {
-    text = String(value ?? '').toLowerCase()
-  }
-
-  const hints = [
-    'mission',
-    '\ubbf8\uc158',
-    'goal',
-    '\ubaa9\ud45c',
-    'quest',
-    'challenge',
-    'participation',
-    'pending',
-    'approved',
-    'settle',
-    'result',
-  ]
-  return hints.filter((hint) => text.includes(hint.toLowerCase()))
 }
 
 function asString(value: unknown): string | undefined {
@@ -154,11 +127,6 @@ export function recordRawSessionEvent(input: {
   const firstArg = rawArgs[0]
   const parsedFirstArg = safeForStore(parseMaybeJSON(firstArg))
   const parsed = toRecord(parsedFirstArg)
-  const missionHints = Array.from(new Set([
-    ...findMissionHints(input.eventName),
-    ...findMissionHints(rawArgs),
-    ...findMissionHints(parsed),
-  ]))
 
   const entry: RawSessionDebugEntry = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -173,12 +141,10 @@ export function recordRawSessionEvent(input: {
     donationType: findStringByKeys(parsedFirstArg, ['donationType']),
     status: findStringByKeys(parsedFirstArg, ['status']),
     kind: findStringByKeys(parsedFirstArg, ['kind']),
-    missionKey: findStringByKeys(parsedFirstArg, ['missionKey', 'mission_key', 'key']),
-    title: findStringByKeys(parsedFirstArg, ['title', 'missionTitle', 'mission_title']),
+    title: findStringByKeys(parsedFirstArg, ['title']),
     payAmount: findStringByKeys(parsedFirstArg, ['payAmount', 'amount']),
     donationText: findStringByKeys(parsedFirstArg, ['donationText', 'message', 'content']),
     donatorNickname: findStringByKeys(parsedFirstArg, ['donatorNickname', 'nickname']),
-    missionHints,
     rawArgs,
     firstArg: parsedFirstArg,
     parsed,
@@ -197,10 +163,6 @@ export function recordRawDonationEvent(input: {
   const parsed = toRecord(input.parsed)
   const raw = safeForStore(parseMaybeJSON(input.raw))
   const safeParsed = toRecord(safeForStore(parsed))
-  const missionHints = Array.from(new Set([
-    ...findMissionHints(raw),
-    ...findMissionHints(safeParsed),
-  ]))
 
   const entry: RawDonationDebugEntry = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -212,7 +174,6 @@ export function recordRawDonationEvent(input: {
     payAmount: asString(safeParsed.payAmount),
     donationText: asString(safeParsed.donationText),
     donatorNickname: asString(safeParsed.donatorNickname),
-    missionHints,
     raw,
     parsed: safeParsed,
   }

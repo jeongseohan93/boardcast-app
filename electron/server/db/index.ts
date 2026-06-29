@@ -89,28 +89,10 @@ function migrate() {
       PRIMARY KEY (channel_id, follower_channel_id)
     );
 
-    CREATE TABLE IF NOT EXISTS missions (
-      id                   INTEGER PRIMARY KEY AUTOINCREMENT,
-      channel_id           TEXT    NOT NULL,
-      mission_donation_id  TEXT    NOT NULL UNIQUE,
-      mission_text         TEXT    NOT NULL,
-      status               TEXT    NOT NULL DEFAULT 'PENDING',
-      success              INTEGER NOT NULL DEFAULT 0,
-      pay_amount           INTEGER NOT NULL DEFAULT 0,
-      donator_nickname     TEXT    NOT NULL,
-      donator_channel_id   TEXT    NOT NULL,
-      duration_time        INTEGER,
-      mission_created_time TEXT,
-      mission_end_time     TEXT,
-      created_at           TEXT    NOT NULL,
-      updated_at           TEXT    NOT NULL
-    );
-
     CREATE INDEX IF NOT EXISTS idx_donations_channel_created ON donations(channel_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_subscriptions_channel_created ON subscriptions(channel_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_follows_channel_created ON follows(channel_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_follower_list_staging_channel ON follower_list_staging(channel_id);
-    CREATE INDEX IF NOT EXISTS idx_missions_channel_created ON missions(channel_id, created_at);
 
     CREATE TABLE IF NOT EXISTS attendance (
       id                 INTEGER PRIMARY KEY AUTOINCREMENT,

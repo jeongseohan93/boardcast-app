@@ -117,7 +117,6 @@ export const OVERLAYS: OverlayDef[] = [
   { key: 'tamagotchi', label: '다마고치 오버레이',  path: '/overlay/tamagotchi', color: '#F472B6', testType: 'tamagotchi', themes: []              },
   { key: 'emote',      label: '이모티콘 파티',     path: '/overlay/emote',      color: '#F472B6', testType: 'emote',      themes: EMOTE_THEMES    },
   { key: 'video-donation', label: '영상 후원',      path: '/overlay/video-donation', color: '#38BDF8', testType: 'video-donation', themes: [] },
-  { key: 'mission',       label: '미션 알림',       path: '/overlay/mission',        color: '#00FFA3', testType: 'mission',        themes: [] },
 ]
 
 export function buildOverlayUrl(

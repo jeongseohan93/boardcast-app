@@ -18,8 +18,6 @@ import { getRoulettes } from '../routes/roulette'
 import { applyTamagotchiDonation } from './tamagotchiService'
 import { addVideoDonation, getVideoDonationConfig, getVideoDonationQueue, isCurrentlyPlaying, playVideoDonation } from './videoDonationService'
 import { recordRawDonationEvent, recordRawSessionEvent } from './rawEventDebugService'
-import { ChzzkInternalChat } from './chzzkInternalChat'
-import { saveMissionToDB } from '../routes/mission'
 
 function parseMaybeJSON(value: unknown): unknown {
   if (typeof value !== 'string') return value
@@ -120,7 +118,6 @@ export class ChzzkSession {
   private tokenRefresher: (() => Promise<string | null>) | null = null
   private refreshAttempted = false
   private chatChannelId: string | null = null
-  private internalChat: ChzzkInternalChat | null = null
 
   getChatChannelId(): string | null {
     return this.chatChannelId
@@ -186,7 +183,6 @@ export class ChzzkSession {
         donationType: debugEntry.donationType,
         status: debugEntry.status,
         kind: debugEntry.kind,
-        missionHints: debugEntry.missionHints,
       })
       this.io.emit('debug:sessionRaw', debugEntry)
     } catch (err) {
@@ -215,7 +211,7 @@ export class ChzzkSession {
       return
     }
 
-    for (const eventName of ['SYSTEM', 'DONATION', 'SUBSCRIPTION', 'MISSION', 'MISSION_PARTICIPATION']) {
+    for (const eventName of ['SYSTEM', 'DONATION', 'SUBSCRIPTION']) {
       socket.on(eventName, (raw: unknown) => this.captureRawSessionEvent(eventName, [raw]))
     }
   }
@@ -280,7 +276,6 @@ export class ChzzkSession {
         if (data.chatChannelId && !this.chatChannelId) {
           this.chatChannelId = data.chatChannelId
           console.log('[ChzzkSession] chatChannelId captured:', this.chatChannelId)
-          this.startInternalChat(this.chatChannelId)
         }
 
         this.io.emit('chat', {
@@ -349,7 +344,6 @@ export class ChzzkSession {
           id: debugEntry.id,
           keys: debugEntry.keys,
           donationType: debugEntry.donationType,
-          missionHints: debugEntry.missionHints,
         })
         this.io.emit('debug:donationRaw', debugEntry)
 
@@ -560,29 +554,15 @@ export class ChzzkSession {
       console.error('[ChzzkSession] subscription subscribe failed:', detail)
     }
 
-    // 미션 이벤트 구독 시도 (공식 문서에 없으므로 실패해도 무시)
-    const missionEndpoints = ['mission', 'activity_feed', 'activity']
-    for (const ep of missionEndpoints) {
-      try {
-        const mRes = await axios.post(`${BASE}/subscribe/${ep}`, null, { headers, params })
-        console.log(`[ChzzkSession] ${ep} subscribe:`, mRes.status, JSON.stringify(mRes.data))
-      } catch (err) {
-        const detail = axios.isAxiosError(err)
-          ? `HTTP ${err.response?.status}: ${JSON.stringify(err.response?.data)}`
-          : String(err)
-        console.log(`[ChzzkSession] ${ep} subscribe attempt:`, detail)
-      }
-    }
-
     console.log('[ChzzkSession] Subscribe calls completed for sessionKey:', this.sessionKey?.slice(0, 8) + '...')
 
-    // CHAT 이벤트 없이도 내부 채팅 연결 시작
+    // CHAT 이벤트 없이도 활동제한 등에 필요한 chatChannelId를 미리 캐시
     if (!this.chatChannelId) {
-      this.fetchChatChannelIdAndStartInternal()
+      this.fetchChatChannelId()
     }
   }
 
-  private async fetchChatChannelIdAndStartInternal() {
+  private async fetchChatChannelId() {
     try {
       // Electron 세션에서 NID 쿠키 추출 (chzzkInternalChat과 동일 패턴)
       const { session } = await import('electron')
@@ -606,7 +586,6 @@ export class ChzzkSession {
       if (chatChannelId && !this.chatChannelId) {
         this.chatChannelId = chatChannelId
         console.log('[ChzzkSession] chatChannelId (from live-detail API):', chatChannelId)
-        this.startInternalChat(chatChannelId)
       } else {
         console.log('[ChzzkSession] live-detail: chatChannelId 없음 (오프라인?)', JSON.stringify(res.data?.content))
       }
@@ -626,28 +605,6 @@ export class ChzzkSession {
     }, delay)
   }
 
-  private startInternalChat(chatChannelId: string) {
-    if (this.internalChat) return  // 이미 연결 중
-    this.internalChat = new ChzzkInternalChat(
-      chatChannelId,
-      (mission) => {
-        try {
-          saveMissionToDB(this.channelId, mission)
-        } catch (err) {
-          console.error('[ChzzkSession] mission DB save failed:', err)
-        }
-        this.io.emit('mission', mission)
-        console.log('[ChzzkSession] mission emit:', mission.missionText, mission.status)
-      },
-      (raw) => {
-        this.io.emit('debug:internalDonationRaw', raw)
-      },
-    )
-    this.internalChat.connect().catch((err) => {
-      console.error('[ChzzkSession] internalChat connect 실패:', err)
-    })
-  }
-
   disconnect() {
     this.destroyed = true
     if (this.reconnectTimer) {
@@ -658,8 +615,6 @@ export class ChzzkSession {
       this.socket.disconnect()
       this.socket = null
     }
-    this.internalChat?.destroy()
-    this.internalChat = null
     this.sessionKey = null
   }
 }

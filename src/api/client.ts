@@ -18,7 +18,6 @@
  *   roulette.ts      — 룰렛 + 결과 리스트
  *   tamagotchi.ts    — 다마고치
  *   pubg.ts          — PUBG 전적 + 딜 추적
- *   mission.ts       — 미션
  *   videoDonation.ts — 영상 도네이션(영도)
  */
 
@@ -33,7 +32,6 @@ export { botApi, autoNoticeApi } from './bot'
 export { rouletteApi, rouletteListApi } from './roulette'
 export { tamagotchiApi }  from './tamagotchi'
 export { pubgApi }        from './pubg'
-export { missionApi }     from './mission'
 export { videoDonationApi } from './videoDonation'
 export { attendanceApi }  from './attendance'
 export type { AttendanceSettings, AttendanceRow } from './attendance'

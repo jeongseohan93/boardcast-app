@@ -10,7 +10,14 @@ const store = new Store()
 
 const CHZZK_TOKEN_URL = 'https://chzzk.naver.com/auth/v1/token'
 
+type AxiosDetail = {
+  status?: number
+  data?: unknown
+  message: string
+}
+
 function secureSet(key: string, value: string) {
+  secureDel(key)
   try {
     const enc = safeStorage.encryptString(value)
     store.set(`secure_${key}`, enc.toString('base64'))
@@ -34,10 +41,20 @@ function secureDel(key: string) {
   store.delete(`secure_${key}_plain` as never)
 }
 
-function axiosDetail(err: unknown) {
+function axiosDetail(err: unknown): AxiosDetail {
   return axios.isAxiosError(err)
     ? { status: err.response?.status, data: err.response?.data, message: err.message }
-    : String(err)
+    : { message: String(err) }
+}
+
+function responseStatus(detail: AxiosDetail) {
+  return detail.status && detail.status >= 400 && detail.status < 600 ? detail.status : 500
+}
+
+function mask(value: string | null) {
+  if (!value) return 'missing'
+  if (value.length <= 8) return `${value.slice(0, 2)}***`
+  return `${value.slice(0, 4)}...${value.slice(-4)}`
 }
 
 router.get('/callback', (_req, res) => {
@@ -49,15 +66,19 @@ router.post('/token', async (req, res) => {
   const clientId = secureGet('clientId')
   const clientSecret = secureGet('clientSecret')
 
+  if (!code || !state) {
+    return res.status(400).json({ error: { message: 'code/state required' } })
+  }
+
   if (!clientId || !clientSecret) {
     return res.status(400).json({ error: 'clientId/clientSecret not set' })
   }
 
   try {
     console.log('[Auth] Token request params:', {
-      code: code?.slice(0, 20) + '...',
-      state,
-      clientId: clientId?.slice(0, 8) + '...',
+      hasCode: true,
+      hasState: true,
+      clientId: mask(clientId),
     })
 
     const tokenRes = await axios.post(CHZZK_TOKEN_URL, {
@@ -104,7 +125,7 @@ router.post('/token', async (req, res) => {
   } catch (err: unknown) {
     const detail = axiosDetail(err)
     console.error('[Auth] Token exchange failed:', detail)
-    return res.status(500).json({ error: detail })
+    return res.status(responseStatus(detail)).json({ error: detail })
   }
 })
 
@@ -146,7 +167,7 @@ router.post('/refresh', async (_req, res) => {
   } catch (err: unknown) {
     const detail = axiosDetail(err)
     console.error('[Auth] Refresh failed:', detail)
-    return res.status(500).json({ error: detail })
+    return res.status(responseStatus(detail)).json({ error: detail })
   }
 })
 
@@ -214,14 +235,26 @@ router.post('/credentials', (req, res) => {
     return res.status(400).json({ error: 'clientId/clientSecret required' })
   }
 
+  stopChzzkSession()
+  stopPollService()
+  secureDel('accessToken')
+  secureDel('refreshToken')
+  store.delete('tokenExpiresAt' as never)
+  store.delete('channelId' as never)
+  store.delete('channelName' as never)
+  store.delete('channelImageUrl' as never)
+  store.delete('followerCount' as never)
   secureSet('clientId', clientId.trim())
   secureSet('clientSecret', clientSecret.trim())
+  store.set('credentialsUpdatedAt', Date.now())
+  console.log('[Auth] Credentials saved:', { clientId: mask(clientId.trim()) })
   return res.json({ ok: true })
 })
 
 router.get('/credentials', (_req, res) => {
   const clientId = secureGet('clientId')
-  res.json({ clientId: clientId || '' })
+  const credentialsUpdatedAt = store.get('credentialsUpdatedAt') as number | undefined
+  res.json({ clientId: clientId || '', credentialsUpdatedAt: credentialsUpdatedAt || null })
 })
 
 export default router

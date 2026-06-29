@@ -5,7 +5,7 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "predev": "tsc -p tsconfig.electron.json",
-    "dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && cross-env NODE_ENV=development node scripts/launch-electron.js\" ",
+    "dev": "cross-env NODE_ENV=development node scripts/dev.js",
     "build": "vite build && npm run build:electron && electron-builder",
     "build:vite": "vite build",
     "build:electron": "tsc -p tsconfig.electron.json && node scripts/copy-overlays.js",

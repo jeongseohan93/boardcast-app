@@ -36,7 +36,6 @@ import tamagotchiRouter from './routes/tamagotchi'
 import votingRouter from './routes/voting'
 import pubgRouter, { initPubgTracking } from './routes/pubg'
 import videoDonationRouter from './routes/videoDonation'
-import missionRouter from './routes/mission'
 import attendanceRouter from './routes/attendance'
 import donationAlertRouter from './routes/donationAlert'
 import ttsDonationRouter from './routes/ttsDonation'
@@ -91,7 +90,6 @@ export async function startExpressServer(port: number) {
       id: entry.id,
       messageId: entry.messageId,
       dataType: entry.dataType,
-      missionHints: entry.missionHints,
     })
     try { io?.emit('debug:chzzkWebhook', entry) } catch {}
     res.status(204).end()
@@ -105,7 +103,7 @@ export async function startExpressServer(port: number) {
   const ALLOWED_OVERLAYS = new Set([
     'donation', 'follow', 'chat', 'roulette', 'roulette-list',
     'avachat', 'emote', 'slot-roulette', 'tamagotchi',
-    'video-donation', 'vote', 'mission',
+    'video-donation', 'vote',
   ])
   app.get('/overlay/:name', (req, res) => {
     const name = req.params.name
@@ -228,25 +226,6 @@ export async function startExpressServer(port: number) {
       })
       io.emit('videoDonation:queue', getVideoDonationQueue())
       if (item) playVideoDonation(io, item.id)
-    } else if (type === 'mission') {
-      const { saveMissionToDB } = require('./routes/mission')
-      const now = new Date()
-      const endTime = new Date(now.getTime() + 10 * 60 * 1000)
-        .toISOString().replace('T', ' ').slice(0, 19)
-      const mission = {
-        missionDonationId: `test-${Date.now()}`,
-        missionText: req.body?.missionText || '방송 30분 이상 켜두기',
-        status: 'APPROVED',
-        success: false,
-        durationTime: 600,
-        missionCreatedTime: now.toISOString().replace('T', ' ').slice(0, 19),
-        missionEndTime: endTime,
-        payAmount: Number(req.body?.payAmount || 1000),
-        donatorNickname: req.body?.donatorNickname || '테스트유저',
-        donatorChannelId: 'test-channel',
-      }
-      try { saveMissionToDB('test', mission) } catch {}
-      io.emit('mission', mission)
     } else {
       return res.status(400).json({ error: 'unknown type' })
     }
@@ -287,7 +266,6 @@ export async function startExpressServer(port: number) {
   app.use('/api/voting', votingRouter)    // ??筌?
   app.use('/api/pubg', pubgRouter)
   app.use('/api/video-donation', videoDonationRouter)
-  app.use('/api/mission', missionRouter)
   app.use('/api/attendance', attendanceRouter)
   app.use('/api/donation-alert', donationAlertRouter)
   app.use('/api/tts-donation', ttsDonationRouter)
